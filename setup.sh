@@ -35,8 +35,6 @@ docker network create $NETWORK_NAME
 # Create Caddy directory and Docker Compose configuration for Caddy with Docker plugin
 mkdir -p $CADDY_DIR
 cat <<EOF > $CADDY_DIR/docker-compose.yml
-version: '3'
-
 services:
   caddy:
     image: caddy:2
@@ -45,14 +43,14 @@ services:
       - "80:80"
       - "443:443"
     volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"  # Access Docker API
       - "caddy_data:/data"
       - "caddy_config:/config"
-      - "/var/run/docker.sock:/var/run/docker.sock"  # To access Docker API
     environment:
       - CADDY_DOCKER_MODE=true
-      - CADDY_DOCKER_NETWORK=$NETWORK_NAME
+      - CADDY_DOCKER_NETWORK=caddy_network
     networks:
-      - $NETWORK_NAME
+      - caddy_network
     restart: always
 
 volumes:
@@ -67,7 +65,6 @@ EOF
 # Create Portainer directory and Docker Compose configuration
 mkdir -p $PORTAINER_DIR
 cat <<EOF > $PORTAINER_DIR/docker-compose.yml
-version: '3'
 
 services:
   portainer:
@@ -77,7 +74,7 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "portainer_data:/data"
     networks:
-      - $NETWORK_NAME
+      - caddy_network
     labels:
       - caddy=true
       - caddy.reverse_proxy=$DOMAIN=portainer:9000  # Reverse proxy for the specified domain
