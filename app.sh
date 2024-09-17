@@ -3,7 +3,7 @@
 # Define variables
 TRAEFIK_DIR=~/traefik
 NETWORK_NAME="proxy"
-DOMAIN="p.iqon.tech"
+DOMAIN="apps.iqon.tech"
 EMAIL="admin@p.iqon.tech"
 
 # Cleanup any existing Traefik and Yacht containers, networks, and volumes
