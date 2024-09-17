@@ -32,9 +32,11 @@ sudo ufw enable
 echo "Creating user-defined Docker network: $NETWORK_NAME"
 docker network create $NETWORK_NAME
 
-# Create Caddy directory and Docker Compose configuration for Caddy with Docker plugin
+# Create Caddy directory and Docker Compose configuration for Caddy
 mkdir -p $CADDY_DIR
 cat <<EOF > $CADDY_DIR/docker-compose.yml
+version: '3'
+
 services:
   caddy:
     image: caddy:2
@@ -46,9 +48,6 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock"  # Access Docker API
       - "caddy_data:/data"
       - "caddy_config:/config"
-    environment:
-      - CADDY_DOCKER_MODE=true
-      - CADDY_DOCKER_NETWORK=caddy_network
     networks:
       - caddy_network
     restart: always
@@ -58,13 +57,26 @@ volumes:
   caddy_config:
 
 networks:
-  $NETWORK_NAME:
+  caddy_network:
     external: true
+EOF
+
+# Create Caddyfile configuration
+cat <<EOF > $CADDY_DIR/Caddyfile
+{
+  email $EMAIL
+  acme_ca https://acme-v02.api.letsencrypt.org/directory
+}
+
+$DOMAIN {
+  reverse_proxy portainer:9000
+}
 EOF
 
 # Create Portainer directory and Docker Compose configuration
 mkdir -p $PORTAINER_DIR
 cat <<EOF > $PORTAINER_DIR/docker-compose.yml
+version: '3'
 
 services:
   portainer:
@@ -77,7 +89,7 @@ services:
       - caddy_network
     labels:
       - caddy=true
-      - caddy.reverse_proxy=$DOMAIN=portainer:9000  # Reverse proxy for the specified domain
+      - caddy.reverse_proxy.$DOMAIN=portainer:9000  # Reverse proxy for the specified domain
       - caddy.tls.email=$EMAIL  # SSL certificate for the domain
     restart: always
 
@@ -85,7 +97,7 @@ volumes:
   portainer_data:
 
 networks:
-  $NETWORK_NAME:
+  caddy_network:
     external: true
 EOF
 
