@@ -27,13 +27,6 @@ sudo apt install -y docker.io docker-compose
 sudo systemctl enable docker
 sudo systemctl start docker
 
-# Install ufw and allow required ports
-sudo apt install ufw -y
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw allow 8080/tcp  # Traefik dashboard
-sudo ufw enable
-
 # Create a shared Docker network
 docker network create $NETWORK_NAME
 
