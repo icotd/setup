@@ -62,10 +62,10 @@ services:
     restart: unless-stopped
 
   yacht:
-    image: selfhostedpro/yacht
+    image: ghcr.io/selfhostedpro/yacht-nuxt:main
     container_name: yacht
     ports:
-      - "8000:8000"  # Yacht UI
+      - "3000:3000"  # Yacht UI
     volumes:
       - yacht:/config
       - /var/run/docker.sock:/var/run/docker.sock
