@@ -5,7 +5,7 @@ CADDY_DIR=~/caddy
 PORTAINER_DIR=~/portainer
 EMAIL="admin@iqon.tech"
 DOMAIN="p.iqon.tech"
-NETWORK_NAME="shared_network"
+NETWORK_NAME="bridge"
 
 # Cleanup any existing Caddy, Portainer containers, networks, and volumes
 echo "Cleaning up any existing containers, networks, and volumes..."
@@ -15,7 +15,7 @@ docker-compose -f $CADDY_DIR/docker-compose.yml down --volumes || true
 docker-compose -f $PORTAINER_DIR/docker-compose.yml down --volumes || true
 
 # Remove the shared network if it exists
-docker network rm $NETWORK_NAME || true
+# docker network rm $NETWORK_NAME || true
 
 # Remove any orphaned containers and volumes
 docker system prune --volumes -f
