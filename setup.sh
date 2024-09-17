@@ -1,12 +1,10 @@
 #!/bin/bash
 
 # Define variables
-TRAEFIK_DIR=~/traefik
+CADDY_DIR=~/caddy
 PORTAINER_DIR=~/portainer
 EMAIL="admin@iqon.tech"
 DOMAIN="p.iqon.tech"
-NAMECHEAP_API_USER="eservceo"  # Replace with your Namecheap username
-NAMECHEAP_API_KEY="d9443bd295454e409ce1b6f2ac7313d6"  # Replace with your Namecheap API key
 
 # Update and install Docker and Docker Compose
 sudo apt update
@@ -14,46 +12,23 @@ sudo apt install -y docker.io docker-compose
 sudo systemctl enable docker
 sudo systemctl start docker
 
-# Create Traefik directory and configuration
-mkdir -p $TRAEFIK_DIR
-cat <<EOF > $TRAEFIK_DIR/docker-compose.yml
-version: '3'
+# Create Caddy directory and configuration
+mkdir -p $CADDY_DIR
+cat <<EOF > $CADDY_DIR/Dockerfile
+FROM caddy:2
 
-services:
-  traefik:
-    image: traefik:v2.7
-    command:
-      - "--api.insecure=true"  # Enable Traefik dashboard (not recommended for production)
-      - "--providers.docker=true"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.myresolver.acme.dnschallenge=true"
-      - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=namecheap"  # Use Namecheap as the DNS provider
-      - "--certificatesresolvers.myresolver.acme.email=$EMAIL"
-      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"
-      - "./letsencrypt:/letsencrypt"
-      - "./traefik-config:/etc/traefik"
-    environment:
-      - NAMECHEAP_API_USER=$NAMECHEAP_API_USER
-      - NAMECHEAP_API_KEY=$NAMECHEAP_API_KEY
-    restart: always
+COPY Caddyfile /etc/caddy/Caddyfile
 EOF
 
-# Create Traefik static configuration
-mkdir -p $TRAEFIK_DIR/traefik-config
-cat <<EOF > $TRAEFIK_DIR/traefik-config/traefik.yml
-certificatesResolvers:
-  myresolver:
-    acme:
-      email: $EMAIL
-      storage: /letsencrypt/acme.json
-      dnsChallenge:
-        provider: namecheap
+# Create Caddy configuration file
+cat <<EOF > $CADDY_DIR/Caddyfile
+{
+  email $EMAIL
+}
+
+$DOMAIN {
+  reverse_proxy portainer:9000
+}
 EOF
 
 # Create Portainer directory and configuration
@@ -70,21 +45,36 @@ services:
       - "portainer_data:/data"
     ports:
       - "9000:9000"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.portainer.rule=Host(\`$DOMAIN\`)"
-      - "traefik.http.routers.portainer.entrypoints=websecure"
-      - "traefik.http.routers.portainer.tls=true"
-      - "traefik.http.routers.portainer.tls.certresolver=myresolver"
     restart: always
 
 volumes:
   portainer_data:
 EOF
 
-# Start Traefik and Portainer
-echo "Starting Traefik..."
-cd $TRAEFIK_DIR
+# Create Caddy Docker Compose file
+cat <<EOF > $CADDY_DIR/docker-compose.yml
+version: '3'
+
+services:
+  caddy:
+    build: .
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "./Caddyfile:/etc/caddy/Caddyfile"
+      - "caddy_data:/data"
+      - "caddy_config:/config"
+    restart: always
+
+volumes:
+  caddy_data:
+  caddy_config:
+EOF
+
+# Start Caddy and Portainer
+echo "Starting Caddy..."
+cd $CADDY_DIR
 docker-compose up -d
 
 echo "Starting Portainer..."
