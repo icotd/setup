@@ -49,6 +49,7 @@ services:
       - "--entrypoints.websecure.address=:443"
       - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.myresolver.acme.email=$EMAIL"
     ports:
       - "80:80"        # The HTTP port
       - "443:443"      # The HTTPS port
@@ -97,4 +98,9 @@ EOF
 echo "Starting Traefik and Yacht..."
 docker-compose up -d
 
+# Output URLs
 echo "Setup complete. Access the Traefik dashboard at https://$DOMAIN:8080 and Yacht at https://$DOMAIN"
+
+# Verify Traefik logs for Let's Encrypt status
+echo "Checking Traefik logs for certificate issuance..."
+docker logs traefik | grep "Obtaining ACME certificate"
