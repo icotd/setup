@@ -16,7 +16,7 @@ docker-compose -f $TRAEFIK_DIR/docker-compose.yml down --volumes || true
 docker network rm $NETWORK_NAME || true
 
 # Remove orphaned containers and volumes
-docker system prune -a --volumes -f
+docker system prune --volumes -f
 
 # Remove Traefik directory if it exists
 rm -rf $TRAEFIK_DIR
@@ -97,4 +97,4 @@ EOF
 echo "Starting Traefik and Yacht..."
 docker-compose up -d
 
-echo "Setup complete. Access the Traefik dashboard at https://$DOMAIN:8080 and Yacht at http://$DOMAIN:8000"
+echo "Setup complete. Access the Traefik dashboard at https://$DOMAIN:8080 and Yacht at https://$DOMAIN"
