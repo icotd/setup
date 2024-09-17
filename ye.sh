@@ -62,28 +62,32 @@ services:
     restart: unless-stopped
 
   yacht:
-    image: ghcr.io/selfhostedpro/yacht-nuxt:main
-    container_name: yacht
-    ports:
-      - "3000:3000"  # Yacht UI
-    volumes:
-      - yacht:/config
-      - /var/run/docker.sock:/var/run/docker.sock
+    image: selfhostedpro/yacht:devel
     restart: unless-stopped
     networks:
       - proxy
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - "SECRET_KEY=my_secret_key"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - ./config:/config
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.yacht.entrypoints=web"
-      - "traefik.http.routers.yacht.rule=Host(\`$DOMAIN\`)"
-      - "traefik.http.middlewares.yacht-https-redirect.redirectscheme.scheme=https"
-      - "traefik.http.routers.yacht.middlewares=yacht-https-redirect"
-      - "traefik.http.routers.yacht-secure.entrypoints=websecure"
-      - "traefik.http.routers.yacht-secure.rule=Host(\`$DOMAIN\`)"
-      - "traefik.http.routers.yacht-secure.tls=true"
-      - "traefik.http.routers.yacht-secure.tls.certresolver=myresolver"
+      - "traefik.http.services.yacht.loadbalancer.server.scheme=http"
       - "traefik.http.services.yacht.loadbalancer.server.port=8000"
+      - "traefik.enable=true"
       - "traefik.docker.network=proxy"
+      - "traefik.http.routers.yacht-http.service=yacht"
+      - "traefik.http.routers.yacht-http.rule=Host(\`yacht.$DOMAIN\`)"
+      - "traefik.http.routers.yacht-http.entrypoints=http"
+      - "traefik.http.routers.yacht.service=yacht"
+      - "traefik.http.routers.yacht.rule=Host(\`yacht.$DOMAIN\`)"
+      - "traefik.http.routers.yacht.entrypoints=https"
+      - "traefik.http.routers.yacht.tls=true"
+      - "traefik.http.routers.yacht.tls.certresolver=myresolver"
+      - "traefik.http.routers.yacht.tls.domains[0].main=$DOMAIN"
+      - "traefik.http.routers.yacht.tls.domains[0].sans=*.$DOMAIN"
 
 volumes:
   yacht:
