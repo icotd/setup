@@ -14,11 +14,19 @@ check_success() {
     fi
 }
 
-echo "Installing Docker and Docker Compose..."
-# Install Docker and Docker Compose
+echo "Installing Docker..."
+# Install Docker using Docker's official convenience script
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
-check_success "Docker and Docker Compose installation failed."
+check_success "Docker installation failed."
+
+echo "Installing Docker Compose..."
+# Install Docker Compose
+# Download Docker Compose binary for the appropriate OS and architecture
+sudo curl -L "https://github.com/docker/compose/releases/download/v2.29.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+# Make Docker Compose executable
+sudo chmod +x /usr/local/bin/docker-compose
+check_success "Docker Compose installation failed."
 
 # Verify installations
 docker --version
