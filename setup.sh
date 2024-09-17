@@ -6,31 +6,11 @@ PORTAINER_DIR=~/portainer
 EMAIL="admin@iqon.tech"
 DOMAIN="apps.iqon.tech"
 
-# Function to check the last command's success
-check_success() {
-    if [ $? -ne 0 ]; then
-        echo "Error: $1"
-        exit 1
-    fi
-}
-
-echo "Installing Docker..."
-# Install Docker using Docker's official convenience script
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-check_success "Docker installation failed."
-
-echo "Installing Docker Compose..."
-# Install Docker Compose
-# Download Docker Compose binary for the appropriate OS and architecture
-sudo curl -L "https://github.com/docker/compose/releases/download/v2.29.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-# Make Docker Compose executable
-sudo chmod +x /usr/local/bin/docker-compose
-check_success "Docker Compose installation failed."
-
-# Verify installations
-docker --version
-docker-compose --version
+# Update and install Docker and Docker Compose
+sudo apt update
+sudo apt install -y docker.io docker-compose
+sudo systemctl enable docker
+sudo systemctl start docker
 
 # Create Traefik directory and configuration
 mkdir -p $TRAEFIK_DIR
@@ -87,11 +67,9 @@ EOF
 echo "Starting Traefik..."
 cd $TRAEFIK_DIR
 docker-compose up -d
-check_success "Failed to start Traefik."
 
 echo "Starting Portainer..."
 cd $PORTAINER_DIR
 docker-compose up -d
-check_success "Failed to start Portainer."
 
 echo "Setup complete. Access Portainer at https://$DOMAIN"
