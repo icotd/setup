@@ -4,7 +4,7 @@
 TRAEFIK_DIR=~/traefik
 PORTAINER_DIR=~/portainer
 EMAIL="admin@iqon.tech"
-DOMAIN="apps.iqon.tech"
+DOMAIN="p.iqon.tech"
 
 # Update and install Docker and Docker Compose
 sudo apt update
