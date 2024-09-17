@@ -5,6 +5,8 @@ TRAEFIK_DIR=~/traefik
 PORTAINER_DIR=~/portainer
 EMAIL="admin@iqon.tech"
 DOMAIN="p.iqon.tech"
+NAMECHEAP_API_USER="eservceo"  # Replace with your Namecheap username
+NAMECHEAP_API_KEY="d9443bd295454e409ce1b6f2ac7313d6"  # Replace with your Namecheap API key
 
 # Update and install Docker and Docker Compose
 sudo apt update
@@ -25,7 +27,8 @@ services:
       - "--providers.docker=true"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.dnschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=namecheap"  # Use Namecheap as the DNS provider
       - "--certificatesresolvers.myresolver.acme.email=$EMAIL"
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
     ports:
@@ -34,7 +37,23 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "./letsencrypt:/letsencrypt"
+      - "./traefik-config:/etc/traefik"
+    environment:
+      - NAMECHEAP_API_USER=$NAMECHEAP_API_USER
+      - NAMECHEAP_API_KEY=$NAMECHEAP_API_KEY
     restart: always
+EOF
+
+# Create Traefik static configuration
+mkdir -p $TRAEFIK_DIR/traefik-config
+cat <<EOF > $TRAEFIK_DIR/traefik-config/traefik.yml
+certificatesResolvers:
+  myresolver:
+    acme:
+      email: $EMAIL
+      storage: /letsencrypt/acme.json
+      dnsChallenge:
+        provider: namecheap
 EOF
 
 # Create Portainer directory and configuration
