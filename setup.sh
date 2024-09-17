@@ -28,7 +28,7 @@ version: '3'
 
 services:
   caddy:
-    image: caddy:2.6.4-builder-alpine
+    image: caddy:2.8.4-builder-alpine
     container_name: caddy
     ports:
       - "80:80"
