@@ -98,9 +98,18 @@ EOF
 echo "Starting Traefik and Yacht..."
 docker-compose up -d
 
+# Wait a few moments for Traefik to initialize
+sleep 20
+
 # Output URLs
 echo "Setup complete. Access the Traefik dashboard at https://$DOMAIN:8080 and Yacht at https://$DOMAIN"
 
 # Verify Traefik logs for Let's Encrypt status
 echo "Checking Traefik logs for certificate issuance..."
-docker logs traefik | grep "Obtaining ACME certificate"
+docker logs traefik | grep "Obtaining ACME certificate" || echo "No ACME certificate issuance found."
+
+# Provide instructions for additional checks
+echo "If you do not see 'Obtaining ACME certificate' in the logs, please check the following:"
+echo "1. Ensure your domain DNS is correctly pointing to your server."
+echo "2. Check for any errors in the Traefik logs related to certificate issuance."
+echo "3. Verify that port 80 and 443 are open and accessible from the internet."
