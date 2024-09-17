@@ -22,6 +22,12 @@ sudo apt install -y docker.io docker-compose
 sudo systemctl enable docker
 sudo systemctl start docker
 
+# Install ufw and allow required ports
+sudo apt install ufw -y
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable
+
 # Create user-defined network
 echo "Creating user-defined Docker network: $NETWORK_NAME"
 docker network create $NETWORK_NAME
@@ -74,7 +80,7 @@ services:
       - $NETWORK_NAME
     labels:
       - caddy=true
-      - caddy.reverse_proxy.$DOMAIN=portainer:9000  # Reverse proxy for the specified domain
+      - caddy.reverse_proxy=$DOMAIN=portainer:9000  # Reverse proxy for the specified domain
       - caddy.tls.email=$EMAIL  # SSL certificate for the domain
     restart: always
 
