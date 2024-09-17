@@ -7,20 +7,11 @@ EMAIL="admin@iqon.tech"
 DOMAIN="p.iqon.tech"
 NETWORK_NAME="bridge"
 
-# Cleanup any existing Caddy, Portainer containers, networks, and volumes
+# Cleanup any existing containers, networks, and volumes
 echo "Cleaning up any existing containers, networks, and volumes..."
-
-# Stop and remove Caddy and Portainer containers if they exist
 docker-compose -f $CADDY_DIR/docker-compose.yml down --volumes || true
 docker-compose -f $PORTAINER_DIR/docker-compose.yml down --volumes || true
-
-# Remove the shared network if it exists
-# docker network rm $NETWORK_NAME || true
-
-# Remove any orphaned containers and volumes
 docker system prune --volumes -f
-
-# Remove Caddy and Portainer directories if they exist
 rm -rf $CADDY_DIR
 rm -rf $PORTAINER_DIR
 
@@ -30,68 +21,25 @@ sudo apt install -y docker.io docker-compose
 sudo systemctl enable docker
 sudo systemctl start docker
 
-# Create a shared Docker network
-docker network create $NETWORK_NAME
-
-# Create Caddy directory and configuration
+# Create Caddy directory and Docker Compose configuration for Caddy with Docker plugin
 mkdir -p $CADDY_DIR
-cat <<EOF > $CADDY_DIR/Dockerfile
-FROM caddy:2
-
-COPY Caddyfile /etc/caddy/Caddyfile
-EOF
-
-# Create Caddy configuration file
-cat <<EOF > $CADDY_DIR/Caddyfile
-{
-  email $EMAIL
-}
-
-$DOMAIN {
-  reverse_proxy portainer:9000
-}
-EOF
-
-# Create Portainer directory and configuration
-mkdir -p $PORTAINER_DIR
-cat <<EOF > $PORTAINER_DIR/docker-compose.yml
-version: '3'
-
-services:
-  portainer:
-    image: portainer/portainer-ce
-    command: -H unix:///var/run/docker.sock
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"
-      - "portainer_data:/data"
-    networks:
-      - $NETWORK_NAME
-    ports:
-      - "9000:9000"
-    restart: always
-
-volumes:
-  portainer_data:
-
-networks:
-  $NETWORK_NAME:
-    external: true
-EOF
-
-# Create Caddy Docker Compose file
 cat <<EOF > $CADDY_DIR/docker-compose.yml
 version: '3'
 
 services:
   caddy:
-    build: .
+    image: caddy:2.6.4-builder-alpine
+    container_name: caddy
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - "./Caddyfile:/etc/caddy/Caddyfile"
       - "caddy_data:/data"
       - "caddy_config:/config"
+      - "/var/run/docker.sock:/var/run/docker.sock"  # To access Docker API
+    environment:
+      - CADDY_DOCKER_MODE=true
+      - CADDY_DOCKER_NETWORK=$NETWORK_NAME
     networks:
       - $NETWORK_NAME
     restart: always
@@ -105,13 +53,42 @@ networks:
     external: true
 EOF
 
-# Start Caddy and Portainer
+# Create Portainer directory and Docker Compose configuration
+mkdir -p $PORTAINER_DIR
+cat <<EOF > $PORTAINER_DIR/docker-compose.yml
+version: '3'
+
+services:
+  portainer:
+    image: portainer/portainer-ce
+    command: -H unix:///var/run/docker.sock
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "portainer_data:/data"
+    networks:
+      - $NETWORK_NAME
+    labels:
+      - caddy=true
+      - caddy.reverse_proxy.$DOMAIN=portainer:9000  # Reverse proxy for the specified domain
+      - caddy.tls.email=$EMAIL  # SSL certificate for the domain
+    restart: always
+
+volumes:
+  portainer_data:
+
+networks:
+  $NETWORK_NAME:
+    external: true
+EOF
+
+# Start Caddy
 echo "Starting Caddy..."
 cd $CADDY_DIR
 docker-compose up -d
 
+# Start Portainer
 echo "Starting Portainer..."
 cd $PORTAINER_DIR
 docker-compose up -d
 
-echo "Setup complete. Access Portainer at https://$DOMAIN"
+echo "Setup complete. Caddy will automatically handle SSL and reverse proxy for Portainer at https://$DOMAIN."
