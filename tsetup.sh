@@ -2,7 +2,7 @@
 
 # Define variables
 TRAEFIK_DIR=~/traefik
-NETWORK_NAME="traefik_proxy"
+NETWORK_NAME="proxy"
 DOMAIN="p.iqon.tech"
 EMAIL="admin@p.iqon.tech"
 
@@ -22,18 +22,11 @@ docker system prune --volumes -f
 rm -rf $TRAEFIK_DIR
 
 # Update and install Docker and Docker Compose
+echo "Installing Docker and Docker Compose..."
 sudo apt update
 sudo apt install -y docker.io docker-compose
 sudo systemctl enable docker
 sudo systemctl start docker
-
-# Install ufw and allow required ports
-sudo apt install ufw -y
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw allow 8080/tcp  # Traefik dashboard
-sudo ufw allow 9000/tcp  # Portainer
-sudo ufw enable
 
 # Create a shared Docker network
 docker network create $NETWORK_NAME
@@ -43,89 +36,65 @@ mkdir -p $TRAEFIK_DIR
 cd $TRAEFIK_DIR
 
 # Create traefik.yml configuration file
-cat <<EOF > traefik.yml
-entryPoints:
-  web:
-    address: ":80"
-  websecure:
-    address: ":443"
-
-providers:
-  docker:
-    exposedByDefault: false
-
-api:
-  dashboard: true
-
-certificatesResolvers:
-  letsencrypt:
-    acme:
-      email: $EMAIL
-      storage: /letsencrypt/acme.json
-      httpChallenge:
-        entryPoint: web
-
-log:
-  level: DEBUG
-EOF
-
-# Create Docker Compose file for Traefik and Portainer
 cat <<EOF > docker-compose.yml
-version: '3'
-
+version: "3.8"
 services:
   traefik:
-    image: traefik:v2.5
+    image: traefik:v2.9
+    container_name: traefik
     command:
       - "--api.insecure=true"
-      - "--providers.docker"
+      - "--providers.docker=true"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.lets-encrypt.acme.tlschallenge=true"
-      - "--certificatesresolvers.lets-encrypt.acme.email=$EMAIL"
-      - "--certificatesresolvers.lets-encrypt.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
     ports:
-      - "80:80"
-      - "443:443"
-      - "8080:8080"  # Traefik Dashboard
+      - "80:80"        # The HTTP port
+      - "443:443"      # The HTTPS port
+      - "8080:8080"    # The dashboard port (optional, only for debugging purposes)
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"
-      - "./traefik.yml:/traefik.yml"
-      - "./letsencrypt:/letsencrypt"
+      - "./letsencrypt:/letsencrypt"  # Store certificates
+      - "/var/run/docker.sock:/var/run/docker.sock"  # Traefik needs to access Docker
     networks:
-      - $NETWORK_NAME
-    restart: always
+      - proxy
+    restart: unless-stopped
 
   portainer:
-    image: portainer/portainer-ce
-    command: -H unix:///var/run/docker.sock
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    ports:
+      - "9000:9000" # Portainer UI
+    volumes:
+      - portainer_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    networks:
+      - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.portainer.rule=Host(\`portainer.$DOMAIN\`)"`
-      - "traefik.http.routers.portainer.entrypoints=web,websecure"
-      - "traefik.http.routers.portainer.tls=true"
-      - "traefik.http.routers.portainer.tls.certresolver=lets-encrypt"
+      - "traefik.http.routers.portainer.entrypoints=web"
+      - "traefik.http.routers.portainer.rule=Host(\`$DOMAIN\`)"
+      - "traefik.http.middlewares.portainer-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.portainer.middlewares=portainer-https-redirect"
+      - "traefik.http.routers.portainer-secure.entrypoints=websecure"
+      - "traefik.http.routers.portainer-secure.rule=Host(\`$DOMAIN\`)"
+      - "traefik.http.routers.portainer-secure.tls=true"
+      - "traefik.http.routers.portainer-secure.tls.certresolver=myresolver"
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
-    ports:
-      - "9000:9000"
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"
-      - portainer_data:/data
-    networks:
-      - $NETWORK_NAME
-    restart: always
+      - "traefik.docker.network=proxy"
 
 volumes:
   portainer_data:
+  letsencrypt:
 
 networks:
-  $NETWORK_NAME:
+  proxy:
     external: true
 EOF
 
 # Start Traefik and Portainer
 echo "Starting Traefik and Portainer..."
-cd $TRAEFIK_DIR
 docker-compose up -d
 
-echo "Setup complete. Access the Traefik dashboard at https://$DOMAIN:8080 and Portainer at https://portainer.$DOMAIN"
+echo "Setup complete. Access the Traefik dashboard at https://$DOMAIN:8080 and Portainer at https://$DOMAIN"
