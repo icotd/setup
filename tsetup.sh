@@ -6,10 +6,10 @@ NETWORK_NAME="traefik_proxy"
 DOMAIN="p.iqon.tech"
 EMAIL="admin@p.iqon.tech"
 
-# Cleanup any existing Traefik container, networks, and volumes
+# Cleanup any existing Traefik and Portainer containers, networks, and volumes
 echo "Cleaning up any existing containers, networks, and volumes..."
 
-# Stop and remove Traefik container if it exists
+# Stop and remove Traefik and Portainer containers if they exist
 docker-compose -f $TRAEFIK_DIR/docker-compose.yml down --volumes || true
 
 # Remove the shared network if it exists
@@ -32,6 +32,7 @@ sudo apt install ufw -y
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 sudo ufw allow 8080/tcp  # Traefik dashboard
+sudo ufw allow 9000/tcp  # Portainer
 sudo ufw enable
 
 # Create a shared Docker network
@@ -68,7 +69,7 @@ log:
   level: DEBUG
 EOF
 
-# Create Docker Compose file for Traefik
+# Create Docker Compose file for Traefik and Portainer
 cat <<EOF > docker-compose.yml
 version: '3'
 
@@ -95,38 +96,36 @@ services:
       - $NETWORK_NAME
     restart: always
 
-networks:
-  $NETWORK_NAME:
-    external: true
-EOF
-
-# Start Traefik
-echo "Starting Traefik..."
-docker-compose up -d
-
-# Create a sample Docker Compose file for an example service (nginx)
-cat <<EOF > $TRAEFIK_DIR/sample-service.yml
-version: '3'
-
-services:
-  myapp:
-    image: nginx:latest
+  portainer:
+    image: portainer/portainer-ce
+    command: -H unix:///var/run/docker.sock
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.myapp.rule=Host(\`myapp.$DOMAIN\`)"
-      - "traefik.http.services.myapp.loadbalancer.server.port=80"
+      - "traefik.http.routers.portainer.rule=Host(\`portainer.$DOMAIN\`)"`
+      - "traefik.http.routers.portainer.entrypoints=web,websecure"
+      - "traefik.http.routers.portainer.tls=true"
+      - "traefik.http.routers.portainer.tls.certresolver=lets-encrypt"
+      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+    ports:
+      - "9000:9000"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - portainer_data:/data
     networks:
       - $NETWORK_NAME
     restart: always
 
+volumes:
+  portainer_data:
+
 networks:
   $NETWORK_NAME:
     external: true
 EOF
 
-# Start the sample service (myapp)
-echo "Starting sample service (nginx)..."
-docker-compose -f $TRAEFIK_DIR/sample-service.yml up -d
+# Start Traefik and Portainer
+echo "Starting Traefik and Portainer..."
+cd $TRAEFIK_DIR
+docker-compose up -d
 
-echo "Setup complete. Access the Traefik dashboard at http://localhost:8080"
-echo "You can access your sample service at https://myapp.$DOMAIN"
+echo "Setup complete. Access the Traefik dashboard at https://$DOMAIN:8080 and Portainer at https://portainer.$DOMAIN"
