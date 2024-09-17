@@ -5,12 +5,13 @@ CADDY_DIR=~/caddy
 PORTAINER_DIR=~/portainer
 EMAIL="admin@iqon.tech"
 DOMAIN="p.iqon.tech"
-NETWORK_NAME="bridge"
+NETWORK_NAME="caddy_network"
 
 # Cleanup any existing containers, networks, and volumes
 echo "Cleaning up any existing containers, networks, and volumes..."
 docker-compose -f $CADDY_DIR/docker-compose.yml down --volumes || true
 docker-compose -f $PORTAINER_DIR/docker-compose.yml down --volumes || true
+docker network rm $NETWORK_NAME || true
 docker system prune --volumes -f
 rm -rf $CADDY_DIR
 rm -rf $PORTAINER_DIR
@@ -21,6 +22,10 @@ sudo apt install -y docker.io docker-compose
 sudo systemctl enable docker
 sudo systemctl start docker
 
+# Create user-defined network
+echo "Creating user-defined Docker network: $NETWORK_NAME"
+docker network create $NETWORK_NAME
+
 # Create Caddy directory and Docker Compose configuration for Caddy with Docker plugin
 mkdir -p $CADDY_DIR
 cat <<EOF > $CADDY_DIR/docker-compose.yml
@@ -28,7 +33,7 @@ version: '3'
 
 services:
   caddy:
-    image: caddy:2.8.4-builder-alpine
+    image: caddy:2
     container_name: caddy
     ports:
       - "80:80"
