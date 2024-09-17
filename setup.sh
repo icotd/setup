@@ -7,6 +7,23 @@ EMAIL="admin@iqon.tech"
 DOMAIN="p.iqon.tech"
 NETWORK_NAME="shared_network"
 
+# Cleanup any existing Caddy, Portainer containers, networks, and volumes
+echo "Cleaning up any existing containers, networks, and volumes..."
+
+# Stop and remove Caddy and Portainer containers if they exist
+docker-compose -f $CADDY_DIR/docker-compose.yml down --volumes || true
+docker-compose -f $PORTAINER_DIR/docker-compose.yml down --volumes || true
+
+# Remove the shared network if it exists
+docker network rm $NETWORK_NAME || true
+
+# Remove any orphaned containers and volumes
+docker system prune --volumes -f
+
+# Remove Caddy and Portainer directories if they exist
+rm -rf $CADDY_DIR
+rm -rf $PORTAINER_DIR
+
 # Update and install Docker and Docker Compose
 sudo apt update
 sudo apt install -y docker.io docker-compose
