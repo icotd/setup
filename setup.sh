@@ -12,7 +12,7 @@ echo "Cleaning up any existing containers, networks, and volumes..."
 docker-compose -f $CADDY_DIR/docker-compose.yml down --volumes || true
 docker-compose -f $PORTAINER_DIR/docker-compose.yml down --volumes || true
 docker network rm $NETWORK_NAME || true
-docker system prune --volumes -f
+docker system prune -a --volumes -f
 rm -rf $CADDY_DIR
 rm -rf $PORTAINER_DIR
 
