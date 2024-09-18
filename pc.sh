@@ -18,7 +18,7 @@ docker-compose -f $PORTAINER_DIR/docker-compose.yml down --volumes || true
 docker network rm $NETWORK_NAME || true
 
 # Remove any orphaned containers and volumes
-docker system prune --volumes -f
+docker system prune -a --volumes -f
 
 # Remove Caddy and Portainer directories if they exist
 rm -rf $CADDY_DIR
