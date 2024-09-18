@@ -5,7 +5,7 @@ CADDY_DIR=~/caddy
 PORTAINER_DIR=~/portainer
 EMAIL="admin@iqon.tech"
 DOMAIN="p.iqon.tech"
-NETWORK_NAME="bridge"
+NETWORK_NAME="caddy_network"
 
 # Cleanup any existing Caddy, Portainer containers, networks, and volumes
 echo "Cleaning up any existing containers, networks, and volumes..."
