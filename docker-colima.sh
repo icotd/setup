@@ -24,4 +24,7 @@ echo "Reloading shell configuration..."
 source ~/.bash_profile
 source ~/.zshrc
 
+echo "Restarting colima..."
+brew services restart colima
+
 echo "Setup complete! You can verify with 'docker info'."
