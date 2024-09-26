@@ -23,11 +23,8 @@ rm -rf $TRAEFIK_DIR
 
 # Update and install Docker and Docker Compose
 echo "Installing Docker and Docker Compose..."
-sudo apt update
-sudo apt install -y docker.io docker-compose
-sudo systemctl enable docker
-sudo systemctl start docker
-
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh 
 # Create a shared Docker network
 docker network create $NETWORK_NAME
 
