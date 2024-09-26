@@ -10,7 +10,7 @@ EMAIL="admin@p.iqon.tech"
 echo "Cleaning up any existing containers, networks, and volumes..."
 
 # Stop and remove Traefik containers if they exist
-docker-compose -f $TRAEFIK_DIR/docker-compose.yml down --volumes || true
+docker compose -f $TRAEFIK_DIR/docker-compose.yml down --volumes || true
 
 # Remove the shared network if it exists
 docker network rm $NETWORK_NAME || true
@@ -99,7 +99,7 @@ EOF
 
 # Start Traefik and surrealist
 echo "Starting Traefik and surrealist..."
-docker-compose up -d
+docker compose up -d
 
 # Wait a few moments for Traefik to initialize
 sleep 20
