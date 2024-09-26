@@ -7,12 +7,23 @@ DOMAIN="db.iqon.tech"
 EMAIL="admin@p.iqon.tech"
 
 # Check if Docker is already installed
-if ! command -v docker &> /dev/null; then
+if command -v docker &> /dev/null; then
+    echo "Docker is already installed, skipping installation."
+else
     echo "Installing Docker and Docker Compose..."
     curl -fsSL https://get.docker.com -o get-docker.sh
+    if [ $? -ne 0 ]; then
+        echo "Failed to download Docker installation script."
+        exit 1
+    fi
+    
     sudo sh get-docker.sh
-else
-    echo "Docker is already installed, skipping installation."
+    if [ $? -ne 0 ]; then
+        echo "Failed to install Docker."
+        exit 1
+    fi
+
+    echo "Docker installed successfully."
 fi
 
 # Cleanup any existing Traefik and surrealist containers, networks, and volumes
