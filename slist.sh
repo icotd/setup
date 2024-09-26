@@ -44,6 +44,6 @@ EOF
 echo "Docker Compose file created successfully."
 
 # Start the service with Docker Compose
-docker-compose up -d
+docker compose up -d
 
 echo "Surrealist service is up and running with Traefik!"
