@@ -36,11 +36,19 @@ docker system prune -a --volumes -f || true
 rm -rf $TRAEFIK_DIR
 
 # Create a shared Docker network
-docker network create $NETWORK_NAME
+docker network create $NETWORK_NAME || { echo "Failed to create Docker network"; exit 1; }
+
+# Install Certbot for SSL management
+sudo apt update -y
+sudo apt install certbot python3-certbot-nginx -y
+sudo certbot --nginx -d $DOMAIN
 
 # Clone the surrealist repository
-git clone --branch feat/docker-image https://github.com/Odonno/surrealist.git
+git clone --branch feat/docker-image https://github.com/Odonno/surrealist.git || { echo "Failed to clone surrealist repository"; exit 1; }
 cd surrealist || { echo "Directory 'surrealist' not found"; exit 1; }
+
+# Overwrite nginx.conf
+curl -o ~/surrealist/nginx/nginx.conf https://raw.githubusercontent.com/icotd/setup/refs/heads/main/nginx.conf || { echo "Failed to download nginx.conf"; exit 1; }
 
 # Build the Docker image
 docker build -t surrealist .
@@ -84,8 +92,6 @@ services:
       - "traefik.http.services.surrealist.loadbalancer.server.port=8080"
       - "traefik.http.routers.surrealist.entrypoints=web,websecure"
       - "traefik.http.routers.surrealist.tls.certresolver=myresolver"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
 
 volumes:
   surrealist:
@@ -95,6 +101,10 @@ networks:
   proxy:
     external: true
 EOF
+
+# Create acme.json file with correct permissions
+touch acme.json
+chmod 600 acme.json
 
 # Start Traefik and surrealist
 echo "Starting Traefik and Surrealist..."
