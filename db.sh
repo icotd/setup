@@ -46,13 +46,14 @@ services:
   traefik:
     image: traefik:v2.9
     container_name: traefik
-    command:
-      - "--providers.docker=true"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
-      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
-      - "--certificatesresolvers.myresolver.acme.email=$EMAIL"
+  command:
+    - "--api.insecure=true"
+    - "--providers.docker=true"
+    - "--entrypoints.web.address=:80"
+    - "--entrypoints.websecure.address=:443"
+    - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+    - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    - "--certificatesresolvers.myresolver.acme.email=$EMAIL"
     ports:
       - "80:80"        # The HTTP port
       - "443:443"      # The HTTPS port
