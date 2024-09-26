@@ -60,7 +60,6 @@ services:
     ports:
       - "80:80"        # The HTTP port
       - "443:443"      # The HTTPS port
-      - "8080:8080"    # The dashboard port (optional, only for debugging purposes)
     volumes:
       - "./letsencrypt:/letsencrypt"  # Store certificates
       - "/var/run/docker.sock:/var/run/docker.sock"  # Traefik needs to access Docker
