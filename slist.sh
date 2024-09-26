@@ -25,6 +25,7 @@ rm -rf $TRAEFIK_DIR
 echo "Installing Docker and Docker Compose..."
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh 
+
 # Create a shared Docker network
 docker network create $NETWORK_NAME
 
@@ -46,7 +47,6 @@ services:
     image: traefik:v2.9
     container_name: traefik
     command:
-      - "--api.insecure=true"
       - "--providers.docker=true"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
@@ -56,7 +56,7 @@ services:
     ports:
       - "80:80"        # The HTTP port
       - "443:443"      # The HTTPS port
-      - "8080:8080"    # The dashboard port (optional, only for debugging purposes)
+      # - "8080:8080"    # The dashboard port (disabled)
     volumes:
       - "./letsencrypt:/letsencrypt"  # Store certificates
       - "/var/run/docker.sock:/var/run/docker.sock"  # Traefik needs to access Docker
@@ -105,7 +105,7 @@ docker compose up -d
 sleep 20
 
 # Output URLs
-echo "Setup complete. Access the Traefik dashboard at https://$DOMAIN:8080 and surrealist at https://$DOMAIN"
+echo "Setup complete. Access surrealist at https://$DOMAIN"
 
 # Verify Traefik logs for Let's Encrypt status
 echo "Checking Traefik logs for certificate issuance..."
