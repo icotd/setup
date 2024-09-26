@@ -35,8 +35,12 @@ docker network rm $NETWORK_NAME || true
 docker system prune -a --volumes -f || true
 rm -rf $TRAEFIK_DIR
 
-# Create a shared Docker network
-docker network create $NETWORK_NAME || { echo "Failed to create Docker network"; exit 1; }
+# Check if the network already exists
+if ! docker network ls | grep -q "$NETWORK_NAME"; then
+    docker network create $NETWORK_NAME || { echo "Failed to create Docker network"; exit 1; }
+else
+    echo "Docker network '$NETWORK_NAME' already exists, skipping creation."
+fi
 
 # Install Certbot for SSL management
 sudo apt update -y
