@@ -73,20 +73,12 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - ./config:/config
     labels:
-      - "traefik.http.services.surrealist.loadbalancer.server.scheme=http"
-      - "traefik.http.services.surrealist.loadbalancer.server.port=8000"
       - "traefik.enable=true"
-      - "traefik.docker.network=proxy"
-      - "traefik.http.routers.surrealist-http.service=surrealist"
-      - "traefik.http.routers.surrealist-http.rule=Host(\`db.$DOMAIN\`)"
-      - "traefik.http.routers.surrealist-http.entrypoints=http"
-      - "traefik.http.routers.surrealist.service=surrealist"
-      - "traefik.http.routers.surrealist.rule=Host(\`db.$DOMAIN\`)"
-      - "traefik.http.routers.surrealist.entrypoints=https"
+      - "traefik.http.routers.surrealist.rule=Host(`db.$DOMAIN`)"
+      - "traefik.http.services.surrealist.loadbalancer.server.port=8000"
+      - "traefik.http.routers.surrealist.entrypoints=http"
       - "traefik.http.routers.surrealist.tls=true"
       - "traefik.http.routers.surrealist.tls.certresolver=myresolver"
-      - "traefik.http.routers.surrealist.tls.domains[0].main=$DOMAIN"
-      - "traefik.http.routers.surrealist.tls.domains[0].sans=*.$DOMAIN"
 
 volumes:
   surrealist:
