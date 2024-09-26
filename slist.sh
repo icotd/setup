@@ -22,9 +22,14 @@ docker system prune -a --volumes -f
 rm -rf $TRAEFIK_DIR
 
 # Update and install Docker and Docker Compose
-echo "Installing Docker and Docker Compose..."
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh 
+# Check if Docker is already installed
+if ! command -v docker &> /dev/null; then
+    echo "Installing Docker and Docker Compose..."
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sudo sh get-docker.sh
+else
+    echo "Docker is already installed, skipping installation."
+fi
 
 # Create a shared Docker network
 docker network create $NETWORK_NAME
@@ -39,25 +44,24 @@ docker build -t surrealist .
 mkdir -p $TRAEFIK_DIR
 cd $TRAEFIK_DIR
 
-# Create docker-compose.yml configuration file
+# Create traefik.yml configuration file
 cat <<EOF > docker-compose.yml
 version: "3.8"
 services:
   traefik:
     image: traefik:v2.9
     container_name: traefik
-  command:
-    - "--api.insecure=true"
-    - "--providers.docker=true"
-    - "--entrypoints.web.address=:80"
-    - "--entrypoints.websecure.address=:443"
-    - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
-    - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
-    - "--certificatesresolvers.myresolver.acme.email=$EMAIL"
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
     ports:
       - "80:80"        # The HTTP port
       - "443:443"      # The HTTPS port
-      # - "8080:8080"    # The dashboard port (disabled)
+      - "8080:8080"    # The dashboard port (optional, only for debugging purposes)
     volumes:
       - "./letsencrypt:/letsencrypt"  # Store certificates
       - "/var/run/docker.sock:/var/run/docker.sock"  # Traefik needs to access Docker
@@ -76,7 +80,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.surrealist.rule=Host(`db.$DOMAIN`)"
-      - "traefik.http.services.surrealist.loadbalancer.server.port=8000"
+      - "traefik.http.services.surrealist.loadbalancer.server.port=8080"
       - "traefik.http.routers.surrealist.entrypoints=http"
       - "traefik.http.routers.surrealist.tls=true"
       - "traefik.http.routers.surrealist.tls.certresolver=myresolver"
