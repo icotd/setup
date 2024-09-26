@@ -56,24 +56,23 @@ cd $TRAEFIK_DIR
 
 # Create traefik.yml configuration file
 cat <<EOF > docker-compose.yml
-version: "3.8"
 services:
   traefik:
-    image: traefik:v2.9
-    container_name: traefik
+    image: traefik:v2.10
     command:
-      - "--api.insecure=true"
       - "--providers.docker=true"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
       - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
-      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.myresolver.acme.email=your-email@example.com"
+      - "--certificatesresolvers.myresolver.acme.storage=/acme.json"
     ports:
-      - "80:80"        # The HTTP port
-      - "443:443"      # The HTTPS port
+      - "80:80"
+      - "443:443"
     volumes:
-      - "./letsencrypt:/letsencrypt"  # Store certificates
-      - "/var/run/docker.sock:/var/run/docker.sock"  # Traefik needs to access Docker
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./acme.json:/acme.json" # Ensure this file has the right permissions
+
     networks:
       - proxy
     restart: unless-stopped
