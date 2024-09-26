@@ -6,6 +6,15 @@ NETWORK_NAME="proxy"
 DOMAIN="db.iqon.tech"
 EMAIL="admin@p.iqon.tech"
 
+# Check if Docker is already installed
+if ! command -v docker &> /dev/null; then
+    echo "Installing Docker and Docker Compose..."
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sudo sh get-docker.sh
+else
+    echo "Docker is already installed, skipping installation."
+fi
+
 # Cleanup any existing Traefik and surrealist containers, networks, and volumes
 echo "Cleaning up any existing containers, networks, and volumes..."
 
@@ -20,16 +29,6 @@ docker system prune -a --volumes -f
 
 # Remove Traefik directory if it exists
 rm -rf $TRAEFIK_DIR
-
-# Update and install Docker and Docker Compose
-# Check if Docker is already installed
-if ! command -v docker &> /dev/null; then
-    echo "Installing Docker and Docker Compose..."
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sudo sh get-docker.sh
-else
-    echo "Docker is already installed, skipping installation."
-fi
 
 # Create a shared Docker network
 docker network create $NETWORK_NAME
