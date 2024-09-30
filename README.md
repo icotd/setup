@@ -13,3 +13,6 @@ curl -sLS https://raw.githubusercontent.com/icotd/setup/main/install.sh | sh
 ```
 curl -sLS https://raw.githubusercontent.com/icotd/setup/main/yacht.sh | sh
 ```
+```
+curl -sLS https://raw.githubusercontent.com/icotd/setup/main/clean-docker.sh | sh
+```
