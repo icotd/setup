@@ -10,3 +10,6 @@ brew install colima docker docker-compose && colima start
 ```
 curl -sLS https://raw.githubusercontent.com/icotd/setup/main/install.sh | sh
 ```
+```
+curl -sLS https://raw.githubusercontent.com/icotd/setup/main/yacht.sh | sh
+```
