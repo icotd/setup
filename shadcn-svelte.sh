@@ -12,17 +12,17 @@ BRANCH="next"
 # Base directory for sparse checkout
 BASE_DIR="sites/docs/src/routes/(app)/examples"
 
-# Prompt user for the component directory
-read -p "Enter the component directory (e.g., authentication/(components)): " COMPONENT_DIR
+# Check if a component directory was passed as an argument
+COMPONENT_DIR=$1
 
-# Combine the base directory with the user-provided component directory
-SPARSE_DIR="$BASE_DIR/$COMPONENT_DIR"
-
-# Check if the component directory is not empty
+# If no argument is provided, exit
 if [ -z "$COMPONENT_DIR" ]; then
     echo "Component directory cannot be empty. Exiting..."
     exit 1
 fi
+
+# Combine the base directory with the user-provided component directory
+SPARSE_DIR="$BASE_DIR/$COMPONENT_DIR"
 
 # Create and navigate to the target directory
 mkdir -p "$TARGET_DIR"
