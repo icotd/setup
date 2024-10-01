@@ -10,7 +10,7 @@ else
 fi
 
 # Directory where you want to clone the specific folder
-TARGET_DIR="$PARENT_DIR/components"
+TARGET_DIR="$PARENT_DIR/examples"
 
 # GitHub repository URL
 REPO_URL="https://github.com/icotd/shadcn-svelte.git"
