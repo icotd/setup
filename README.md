@@ -19,3 +19,6 @@ curl -sLS https://raw.githubusercontent.com/icotd/setup/main/clean-docker.sh | s
 ```
 curl -sLS https://raw.githubusercontent.com/icotd/setup/main/install-docker.sh | sh
 ```
+```
+curl -sLS https://raw.githubusercontent.com/icotd/setup/main/shadcn-svelte.sh | sh
+```
