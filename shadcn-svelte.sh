@@ -1,7 +1,16 @@
 #!/bin/bash
 
+# Create "shadcn-svelte" directory if it doesn't exist
+PARENT_DIR="shadcn-svelte"
+if [ ! -d "$PARENT_DIR" ]; then
+    mkdir -p "$PARENT_DIR"
+    echo "Created directory: $PARENT_DIR"
+else
+    echo "Directory already exists: $PARENT_DIR"
+fi
+
 # Directory where you want to clone the specific folder
-TARGET_DIR="shadcn-svelte-examples"
+TARGET_DIR="$PARENT_DIR/components"
 
 # GitHub repository URL
 REPO_URL="https://github.com/icotd/shadcn-svelte.git"
