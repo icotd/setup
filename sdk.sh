@@ -16,6 +16,13 @@ mkdir -p "$destination"
 echo "Updating SDK Manager..."
 sdkmanager --sdk_root="$destination/" --update
 
+if ! grep -q "$destination/cmdline-tools/latest/bin" ~/.zshrc; then
+    echo "export PATH=\$HOME/$destination/cmdline-tools/latest/bin:\$PATH" >> ~/.zshrc
+fi
+
+echo "Sourcing ~/.zshrc to apply changes..."
+source ~/.zshrc  # Apply changes to PATH
+
 # Install the latest platform tools, build tools, emulator, and system images
 echo "Installing latest platform tools..."
 sdkmanager --sdk_root="$destination/" "platform-tools"
