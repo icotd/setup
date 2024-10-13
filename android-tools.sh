@@ -9,6 +9,6 @@ curl --location -o android.zip $toolsDownloadUrl
 unzip -q android.zip -d ./android-temp
 
 mkdir -p "$destination/cmdline-tools/latest"
-mv ./android-temp/tools/* "$destination/cmdline-tools/latest"
+mv ./android-temp/cmdline-tools/* "$destination/cmdline-tools/latest"
 rm -rf ./android-temp
 # rm android.zip
