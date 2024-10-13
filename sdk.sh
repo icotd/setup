@@ -33,12 +33,28 @@ sdkmanager --sdk_root="$destination/" "platforms;android-34"  # Change "34" to t
 echo "Installing latest sources..."
 sdkmanager --sdk_root="$destination/" "sources;android-34"  # Change "34" to the latest API level if necessary
 
-# # Install the latest system images for Google APIs
+# Update .zshrc for PATH if necessary
+if ! grep -q "$destination/cmdline-tools/latest/bin" ~/.zshrc; then
+    echo "export PATH=\$HOME/$destination/cmdline-tools/latest/bin:\$PATH" >> ~/.zshrc
+fi
+
+if ! grep -q "$destination/tools/bin" ~/.zshrc; then
+    echo "export PATH=\$HOME/$destination/tools/bin:\$PATH" >> ~/.zshrc
+fi
+
+if ! grep -q "$destination/platform-tools" ~/.zshrc; then
+    echo "export PATH=\$HOME/$destination/platform-tools:\$PATH" >> ~/.zshrc
+fi
+
+# Uncomment if you want to install the latest system images for Google APIs
 # echo "Installing latest system images for Google APIs..."
 # sdkmanager --sdk_root="$destination/" "system-images;android-34;google_apis;x86"  # Change "34" to the latest API level if necessary
 
-# # Install the latest SDK patcher
+# Uncomment if you want to install the latest SDK patcher
 # echo "Installing latest SDK patcher..."
 # sdkmanager --sdk_root="$destination/" "patcher;v4"
+
+echo "Sourcing ~/.zshrc to apply changes..."
+source ~/.zshrc  # Apply changes to PATH
 
 echo "Android SDK setup is complete!"
