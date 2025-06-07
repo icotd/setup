@@ -2,11 +2,21 @@
 set -euo pipefail
 
 PHOTON_HOME="$HOME/photon"
-PHOTON_SCRIPT="$PHOTON_HOME/photon.sh"
 PHOTON_JAR="$PHOTON_HOME/photon.jar"
 PHOTON_LOG="$PHOTON_HOME/photon.log"
+PHOTON_SCRIPT="$PHOTON_HOME/photon.sh"
 
-# --- Parse CLI args first ---
+
+mkdir -p "$PHOTON_HOME"
+cd "$PHOTON_HOME"
+curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon.sh -o "$PHOTON_SCRIPT"
+chmod +x "$PHOTON_SCRIPT"
+
+# run the script
+bash "$PHOTON_SCRIPT"
+
+
+# --- Default values ---
 DB_TYPE=""
 COUNTRY_CODE=""
 PHOTON_PORT=""
@@ -14,6 +24,7 @@ LOG_CHOICE=""
 STOP_PHOTON=false
 UNINSTALL_PHOTON=false
 
+# --- Parse CLI arguments ---
 while [[ "$#" -gt 0 ]]; do
   case $1 in
     --db=*) DB_TYPE="${1#*=}";;
@@ -27,22 +38,6 @@ while [[ "$#" -gt 0 ]]; do
   shift
 done
 
-# --- Self-download logic ---
-if [[ "$0" != "$PHOTON_SCRIPT" && ! -f "$PHOTON_SCRIPT" ]]; then
-  mkdir -p "$PHOTON_HOME"
-  cd "$PHOTON_HOME"
-  curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon.sh -o "$PHOTON_SCRIPT"
-  chmod +x "$PHOTON_SCRIPT"
-  echo "📅 Saved photon.sh to $PHOTON_SCRIPT"
-  exec "$PHOTON_SCRIPT" \
-    ${DB_TYPE:+--db=$DB_TYPE} \
-    ${COUNTRY_CODE:+--country=$COUNTRY_CODE} \
-    ${PHOTON_PORT:+--port=$PHOTON_PORT} \
-    ${LOG_CHOICE:+--log=$LOG_CHOICE} \
-    $($STOP_PHOTON && echo "--stop") \
-    $($UNINSTALL_PHOTON && echo "--uninstall")
-fi
-
 # --- Validate or prompt for DB_TYPE ---
 if [[ -z "$DB_TYPE" ]]; then
   echo "What type of database do you want to use? (global/country)"
@@ -54,6 +49,7 @@ if [[ "$DB_TYPE" != "global" && "$DB_TYPE" != "country" ]]; then
   echo "❌ Invalid DB type: $DB_TYPE"
   exit 1
 fi
+
 
 # --- Stop ---
 if $STOP_PHOTON; then
@@ -70,7 +66,7 @@ if $UNINSTALL_PHOTON; then
   echo "Photon uninstalled."
   exit 0
 fi
-
+ 
 # --- Prompt for log ---
 if [[ -z "$LOG_CHOICE" ]]; then
   echo "Enable logging? (y/n) [default: n]"
@@ -126,9 +122,11 @@ install_dependencies
 
 # --- Download Photon JAR ---
 REPO="komoot/photon"
-LATEST_RELEASE="$(curl -s https://api.github.com/repos/$REPO/releases/latest | grep 'tag_name' | sed -E 's/.*"v?([^\"]+)".*/\1/')"
+LATEST_RELEASE="$(curl -s https://api.github.com/repos/$REPO/releases/latest | grep 'tag_name' | sed -E 's/.*"v?([^"]+)".*/\1/')"
 PHOTON_JAR_URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE/photon-$LATEST_RELEASE.jar"
- 
+
+mkdir -p "$PHOTON_HOME"
+cd "$PHOTON_HOME"
 
 if [[ ! -f "$PHOTON_JAR" ]]; then
   echo "Downloading Photon $LATEST_RELEASE..."
@@ -168,8 +166,8 @@ fi
 cat << EOF > "$PHOTON_HOME/start.sh"
 #!/bin/bash
 cd "\$(dirname "\$0")"
-nohup java --enable-native-access=ALL-UNNAMED -Xmx4g -jar photon.jar \
-  -data-dir ./ -listen-port $PHOTON_PORT \
+nohup java --enable-native-access=ALL-UNNAMED -Xmx4g -jar photon.jar \\
+  -data-dir ./ -listen-port $PHOTON_PORT \\
   -default-language en -languages en -cors-any > photon.log 2>&1 &
 EOF
 chmod +x "$PHOTON_HOME/start.sh"
