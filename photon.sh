@@ -6,8 +6,8 @@ PHOTON_JAR="$PHOTON_HOME/photon.jar"
 PHOTON_LOG="$PHOTON_HOME/photon.log"
 PHOTON_SCRIPT="$PHOTON_HOME/photon.sh"
 
-# Download self if not saved locally
-if [[ "$0" != "$PHOTON_SCRIPT" ]]; then
+# Ensure photon.sh is stored and re-executed only once
+if [[ "$(realpath "$0")" != "$(realpath "$PHOTON_SCRIPT")" ]]; then
   mkdir -p "$PHOTON_HOME"
   curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon.sh -o "$PHOTON_SCRIPT"
   chmod +x "$PHOTON_SCRIPT"
@@ -37,12 +37,13 @@ while [[ "$#" -gt 0 ]]; do
   shift
 done
 
-# --- Prompt if DB_TYPE is not set or invalid ---
-while [[ "$DB_TYPE" != "global" && "$DB_TYPE" != "country" ]]; do
+# Prompt only once for DB_TYPE if not passed
+while [[ -z "$DB_TYPE" || ( "$DB_TYPE" != "global" && "$DB_TYPE" != "country" ) ]]; do
   echo "What type of database do you want to use? (global/country)"
   read -r DB_TYPE
   DB_TYPE="$(echo "$DB_TYPE" | tr '[:upper:]' '[:lower:]')"
 done
+
 
 # --- Stop ---
 if $STOP_PHOTON; then
