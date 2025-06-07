@@ -37,6 +37,14 @@ while [[ "$#" -gt 0 ]]; do
   shift
 done
 
+# --- Prompt if DB_TYPE is not set or invalid ---
+while [[ "$DB_TYPE" != "global" && "$DB_TYPE" != "country" ]]; do
+  echo "What type of database do you want to use? (global/country)"
+  read -r DB_TYPE
+  DB_TYPE="$(echo "$DB_TYPE" | tr '[:upper:]' '[:lower:]')"
+done
+
+
 # --- Stop ---
 if $STOP_PHOTON; then
   echo "Stopping Photon server..."
@@ -53,12 +61,6 @@ if $UNINSTALL_PHOTON; then
   exit 0
 fi
 
-# --- Validate DB type ---
-DB_TYPE="$(echo "$DB_TYPE" | tr '[:upper:]' '[:lower:]')"
-if [[ "$DB_TYPE" != "global" && "$DB_TYPE" != "country" ]]; then
-  echo "Invalid DB type: $DB_TYPE"
-  exit 1
-fi
 
 # --- Prompt for country if needed ---
 if [[ "$DB_TYPE" == "country" && -z "$COUNTRY_CODE" ]]; then
