@@ -27,8 +27,8 @@ while [[ "$#" -gt 0 ]]; do
   shift
 done
 
-# --- Self-download logic ---
-if [[ "$(realpath "$0")" != "$(realpath "$PHOTON_SCRIPT")" ]]; then
+# --- Self-download logic (fallback for systems without realpath) ---
+if [[ "$0" != "$PHOTON_SCRIPT" && ! -f "$PHOTON_SCRIPT" ]]; then
   mkdir -p "$PHOTON_HOME"
   curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon.sh -o "$PHOTON_SCRIPT"
   chmod +x "$PHOTON_SCRIPT"
@@ -125,7 +125,7 @@ install_dependencies
 
 # --- Download Photon JAR ---
 REPO="komoot/photon"
-LATEST_RELEASE="$(curl -s https://api.github.com/repos/$REPO/releases/latest | grep 'tag_name' | sed -E 's/.*"v?([^\"]+)".*/\1/')"
+LATEST_RELEASE="$(curl -s https://api.github.com/repos/$REPO/releases/latest | grep 'tag_name' | sed -E 's/.*"v?([^"]+)".*/\1/')"
 PHOTON_JAR_URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE/photon-$LATEST_RELEASE.jar"
 
 mkdir -p "$PHOTON_HOME"
