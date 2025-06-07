@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PHOTON_HOME="$HOME/photon"
-PHOTON_SCRIPT="$PHOTON_HOME/photon_install.sh"
+PHOTON_SCRIPT="$PHOTON_HOME/photon.sh"
 PHOTON_JAR="$PHOTON_HOME/photon.jar"
 PHOTON_LOG="$PHOTON_HOME/photon.log"
 
@@ -30,7 +30,7 @@ done
 # --- Self-download logic ---
 if [[ "$(realpath "$0")" != "$(realpath "$PHOTON_SCRIPT")" ]]; then
   mkdir -p "$PHOTON_HOME"
-  curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon_install.sh -o "$PHOTON_SCRIPT"
+  curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon.sh -o "$PHOTON_SCRIPT"
   chmod +x "$PHOTON_SCRIPT"
   echo "Saved photon.sh to $PHOTON_SCRIPT"
   exec "$PHOTON_SCRIPT" \
@@ -42,12 +42,17 @@ if [[ "$(realpath "$0")" != "$(realpath "$PHOTON_SCRIPT")" ]]; then
     $([[ "$UNINSTALL_PHOTON" == true ]] && echo "--uninstall")
 fi
 
-# Validate or prompt for DB_TYPE
-while [[ -z "$DB_TYPE" || ( "$DB_TYPE" != "global" && "$DB_TYPE" != "country" ) ]]; do
+# --- Validate or prompt for DB_TYPE ---
+if [[ -z "$DB_TYPE" ]]; then
   echo "What type of database do you want to use? (global/country)"
   read -r DB_TYPE
   DB_TYPE="$(echo "$DB_TYPE" | tr '[:upper:]' '[:lower:]')"
-done
+fi
+
+if [[ "$DB_TYPE" != "global" && "$DB_TYPE" != "country" ]]; then
+  echo "❌ Invalid DB type: $DB_TYPE"
+  exit 1
+fi
 
 # --- Stop ---
 if $STOP_PHOTON; then
@@ -163,9 +168,9 @@ fi
 # --- start.sh ---
 cat << EOF > "$PHOTON_HOME/start.sh"
 #!/bin/bash
-cd "\\$(dirname "\$0")"
-nohup java --enable-native-access=ALL-UNNAMED -Xmx4g -jar photon.jar \\
-  -data-dir ./ -listen-port $PHOTON_PORT \\
+cd "\$(dirname "\$0")"
+nohup java --enable-native-access=ALL-UNNAMED -Xmx4g -jar photon.jar \
+  -data-dir ./ -listen-port $PHOTON_PORT \
   -default-language en -languages en -cors-any > photon.log 2>&1 &
 EOF
 chmod +x "$PHOTON_HOME/start.sh"
@@ -190,7 +195,7 @@ chmod +x "$PHOTON_HOME/uninstall.sh"
 
 # --- Output ---
 echo
-echo "\xf0\x9f\x8c\x8d Photon is running at: http://localhost:$PHOTON_PORT"
-echo "\xe2\x96\xb6 Start again: $PHOTON_HOME/start.sh"
-echo "\xe2\x8f\xb9 Stop:        $PHOTON_HOME/stop.sh"
-echo "\xf0\x9f\x97\x91 Uninstall:   $PHOTON_HOME/uninstall.sh"
+echo "🌍 Photon is running at: http://localhost:$PHOTON_PORT"
+echo "▶ Start again: $PHOTON_HOME/start.sh"
+echo "⏹ Stop:        $PHOTON_HOME/stop.sh"
+echo "🗑 Uninstall:   $PHOTON_HOME/uninstall.sh"
