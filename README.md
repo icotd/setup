@@ -1,6 +1,14 @@
 ```
 curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon.sh | bash
 ```
+
+```
+curl -sL https://raw.githubusercontent.com/icotd/setup/main/photon.sh -o setup_photon.sh
+chmod +x setup_photon.sh
+./setup_photon.sh --db=country --country=et --port=8080 --log=yes
+
+```
+
 ```
 curl -sLS https://raw.githubusercontent.com/icotd/setup/main/slist.sh | sh
 ```
