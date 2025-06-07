@@ -44,7 +44,6 @@ while [[ "$DB_TYPE" != "global" && "$DB_TYPE" != "country" ]]; do
   DB_TYPE="$(echo "$DB_TYPE" | tr '[:upper:]' '[:lower:]')"
 done
 
-
 # --- Stop ---
 if $STOP_PHOTON; then
   echo "Stopping Photon server..."
@@ -60,14 +59,7 @@ if $UNINSTALL_PHOTON; then
   echo "Photon uninstalled."
   exit 0
 fi
-
-
-# --- Prompt for country if needed ---
-if [[ "$DB_TYPE" == "country" && -z "$COUNTRY_CODE" ]]; then
-  echo "Enter 2-letter country code (e.g. et):"
-  read -r COUNTRY_CODE
-fi
-
+ 
 # --- Prompt for log ---
 if [[ -z "$LOG_CHOICE" ]]; then
   echo "Enable logging? (y/n) [default: n]"
