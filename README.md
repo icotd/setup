@@ -1,5 +1,5 @@
 ```
-curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon.sh | sh
+curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon.sh | bash
 ```
 ```
 curl -sLS https://raw.githubusercontent.com/icotd/setup/main/slist.sh | sh
