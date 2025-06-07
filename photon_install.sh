@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PHOTON_HOME="$HOME/photon"
-PHOTON_SCRIPT="$PHOTON_HOME/photon.sh"
+PHOTON_SCRIPT="$PHOTON_HOME/photon_install.sh"
 PHOTON_JAR="$PHOTON_HOME/photon.jar"
 PHOTON_LOG="$PHOTON_HOME/photon.log"
 
@@ -30,7 +30,7 @@ done
 # --- Self-download logic ---
 if [[ "$(realpath "$0")" != "$(realpath "$PHOTON_SCRIPT")" ]]; then
   mkdir -p "$PHOTON_HOME"
-  curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon.sh -o "$PHOTON_SCRIPT"
+  curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon_install.sh -o "$PHOTON_SCRIPT"
   chmod +x "$PHOTON_SCRIPT"
   echo "Saved photon.sh to $PHOTON_SCRIPT"
   exec "$PHOTON_SCRIPT" \
