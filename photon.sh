@@ -5,9 +5,14 @@ set -euo pipefail
 echo "Detecting OS and installing dependencies..."
 
 install_dependencies() {
+    command_exists() {
+        command -v "$1" >/dev/null 2>&1
+    }
+
     if [[ "$OSTYPE" == "darwin"* ]]; then
         echo "Detected macOS"
-        if ! command -v brew &>/dev/null; then
+
+        if ! command_exists brew; then
             echo "Homebrew not found. Do you want to install it? (y/n)"
             read -r answer
             if [[ "$answer" =~ ^[Yy]$ ]]; then
@@ -18,7 +23,17 @@ install_dependencies() {
                 exit 1
             fi
         fi
-        brew install openjdk pbzip2 wget
+
+        # Install dependencies only if missing
+        for pkg in openjdk pbzip2 wget; do
+            if ! brew list --versions "$pkg" >/dev/null; then
+                echo "Installing $pkg..."
+                brew install "$pkg"
+            else
+                echo "$pkg already installed."
+            fi
+        done
+
         export PATH="$(brew --prefix)/opt/openjdk/bin:$PATH"
 
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -69,7 +84,6 @@ echo "What type of database do you want to use? (global/country)"
 read -r DB_TYPE
 
 COUNTRY_CODE=""
-
 if [[ "$DB_TYPE" == "country" ]]; then
     echo "Provide the 2-letter country code (e.g., et for Ethiopia):"
     read -r COUNTRY_CODE
@@ -80,10 +94,7 @@ elif [[ "$DB_TYPE" != "global" ]]; then
 fi
 
 REPO="komoot/photon"
-
-# Get latest release version from GitHub
 LATEST_RELEASE="$(curl -s https://api.github.com/repos/$REPO/releases/latest | grep 'tag_name' | sed -E 's/.*"v?([^"]+)".*/\1/')"
-
 PHOTON_JAR_DOWNLOAD_URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE/photon-$LATEST_RELEASE.jar"
 
 # Download Photon JAR if not already present
@@ -107,12 +118,12 @@ else
     wget --tries=3 --retry-connrefused -O - "$GLOBAL_DB_URL" | pbzip2 -cd | tar x
 fi
 
-# Ask if logging should be enabled
+# Logging choice
 echo "Do you want to enable logging? (y/n) [default: n]"
 read -r LOG_CHOICE
 LOG_CHOICE="${LOG_CHOICE:-n}"
 
-# Ask for custom port
+# Port prompt
 echo "What port do you want to use for the Photon server? [default: 2322]"
 read -r PHOTON_PORT
 PHOTON_PORT="${PHOTON_PORT:-2322}"
@@ -127,7 +138,7 @@ if [[ "$LOG_CHOICE" =~ ^[Yy]$ ]]; then
       -languages en \
       -cors-any > photon.log 2>&1 &
     echo "Photon server is running in the background with logging enabled."
-    echo "Logs can be found at: $PHOTON_HOME/photon.log"
+    echo "Logs: $PHOTON_HOME/photon.log"
 else
     java -Xmx4g -jar photon.jar \
       -data-dir ./ \
@@ -137,15 +148,15 @@ else
       -cors-any
 fi
 
-# Create a helper script for future restarts
-cat << 'EOF' > "$PHOTON_HOME/start.sh"
+# Create restart helper script
+cat << EOF > "$PHOTON_HOME/start.sh"
 #!/bin/bash
-cd "$(dirname "$0")"
-java -Xmx4g -jar photon.jar \
-  -data-dir ./ \
-  -listen-port $PHOTON_PORT \
-  -default-language en \
-  -languages en \
+cd "\$(dirname "\$0")"
+java -Xmx4g -jar photon.jar \\
+  -data-dir ./ \\
+  -listen-port $PHOTON_PORT \\
+  -default-language en \\
+  -languages en \\
   -cors-any
 EOF
 
