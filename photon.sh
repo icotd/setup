@@ -2,9 +2,16 @@
 
 set -euo pipefail
 
+# Set Photon installation path early
 PHOTON_HOME="$HOME/photon"
 PHOTON_JAR="$PHOTON_HOME/photon.jar"
 PHOTON_LOG="$PHOTON_HOME/photon.log"
+
+# Create directory and download script
+mkdir -p "$PHOTON_HOME"
+cd "$PHOTON_HOME"
+curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon.sh -o "$PHOTON_HOME/photon.sh"
+chmod +x "$PHOTON_HOME/photon.sh"
 
 # Default values
 DB_TYPE=""
@@ -27,14 +34,12 @@ while [[ "$#" -gt 0 ]]; do
   shift
 done
 
-# --- STOP logic ---
 if $STOP_PHOTON; then
   echo "Stopping Photon server..."
   pkill -f "photon.jar" && echo "Photon stopped." || echo "Photon is not running."
   exit 0
 fi
 
-# --- UNINSTALL logic ---
 if $UNINSTALL_PHOTON; then
   echo "Stopping Photon server and removing $PHOTON_HOME..."
   pkill -f "photon.jar" || true
@@ -43,7 +48,6 @@ if $UNINSTALL_PHOTON; then
   exit 0
 fi
 
-# --- INSTALL/START logic ---
 echo "Detecting OS and installing dependencies..."
 
 install_dependencies() {
@@ -65,7 +69,6 @@ install_dependencies() {
       brew list --versions "$pkg" >/dev/null || brew install "$pkg"
     done
     export PATH="$(brew --prefix)/opt/openjdk/bin:$PATH"
-
   elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     if [[ -f /etc/os-release ]]; then . /etc/os-release; DISTRO="$ID"; else
       echo "Cannot detect Linux distro"; exit 1
@@ -85,17 +88,13 @@ install_dependencies() {
 
 install_dependencies
 
-mkdir -p "$PHOTON_HOME"
-cd "$PHOTON_HOME"
-
-# Prompt for DB type if not passed
+# Prompt for DB type
 if [[ -z "$DB_TYPE" ]]; then
   echo "What type of database? (global/country)"
   read -r DB_TYPE
 fi
 DB_TYPE="$(echo "$DB_TYPE" | tr '[:upper:]' '[:lower:]')"
 
-# Prompt for country code if needed
 if [[ "$DB_TYPE" == "country" && -z "$COUNTRY_CODE" ]]; then
   echo "Enter 2-letter country code (e.g. et):"
   read -r COUNTRY_CODE
@@ -106,21 +105,18 @@ if [[ "$DB_TYPE" != "global" && "$DB_TYPE" != "country" ]]; then
   exit 1
 fi
 
-# Prompt for logging if not passed
 if [[ -z "$LOG_CHOICE" ]]; then
   echo "Enable logging? (y/n) [default: n]"
   read -r LOG_CHOICE
 fi
 LOG_CHOICE="$(echo "${LOG_CHOICE:-n}" | tr '[:upper:]' '[:lower:]')"
 
-# Prompt for port if not passed
 if [[ -z "$PHOTON_PORT" ]]; then
   echo "Port to use? [default: 2322]"
   read -r PHOTON_PORT
 fi
 PHOTON_PORT="${PHOTON_PORT:-2322}"
 
-# Get Photon release
 REPO="komoot/photon"
 LATEST_RELEASE="$(curl -s https://api.github.com/repos/$REPO/releases/latest | grep 'tag_name' | sed -E 's/.*"v?([^"]+)".*/\1/')"
 PHOTON_JAR_URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE/photon-$LATEST_RELEASE.jar"
@@ -132,7 +128,6 @@ else
   echo "Photon jar exists. Skipping download."
 fi
 
-# Download DB
 GLOBAL_DB="https://download1.graphhopper.com/public/photon-db-latest.tar.bz2"
 COUNTRY_DB="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest.tar.bz2"
 
@@ -144,7 +139,6 @@ else
   wget -O - "$GLOBAL_DB" | pbzip2 -cd | tar x
 fi
 
-# Start Photon
 echo "Starting Photon on port $PHOTON_PORT..."
 
 if [[ "$LOG_CHOICE" == "y" ]]; then
@@ -165,7 +159,6 @@ else
   echo "Photon started silently."
 fi
 
-# start.sh
 cat << EOF > "$PHOTON_HOME/start.sh"
 #!/bin/bash
 cd "\$(dirname "\$0")"
@@ -178,7 +171,6 @@ nohup java --enable-native-access=ALL-UNNAMED -Xmx4g -jar photon.jar \\
 EOF
 chmod +x "$PHOTON_HOME/start.sh"
 
-# stop.sh
 cat << 'EOF' > "$PHOTON_HOME/stop.sh"
 #!/bin/bash
 echo "Stopping Photon..."
@@ -186,7 +178,6 @@ pkill -f "photon.jar" && echo "Photon stopped." || echo "Photon not running."
 EOF
 chmod +x "$PHOTON_HOME/stop.sh"
 
-# uninstall.sh
 cat << EOF > "$PHOTON_HOME/uninstall.sh"
 #!/bin/bash
 echo "Uninstalling Photon..."
