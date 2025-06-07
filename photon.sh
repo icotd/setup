@@ -8,12 +8,12 @@ PHOTON_SCRIPT="$PHOTON_HOME/photon.sh"
 
 
 mkdir -p "$PHOTON_HOME"
-cd "$PHOTON_HOME"
 curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon.sh -o "$PHOTON_SCRIPT"
 chmod +x "$PHOTON_SCRIPT"
 
+cd ~/photon
 # run the script
-bash "$PHOTON_SCRIPT"
+./photon.sh
 
 
 # --- Default values ---
