@@ -2,20 +2,11 @@
 set -euo pipefail
 
 PHOTON_HOME="$HOME/photon"
+PHOTON_SCRIPT="$PHOTON_HOME/photon.sh"
 PHOTON_JAR="$PHOTON_HOME/photon.jar"
 PHOTON_LOG="$PHOTON_HOME/photon.log"
-PHOTON_SCRIPT="$PHOTON_HOME/photon.sh"
 
-# Ensure photon.sh is stored and re-executed only once
-if [[ "$(realpath "$0")" != "$(realpath "$PHOTON_SCRIPT")" ]]; then
-  mkdir -p "$PHOTON_HOME"
-  curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon.sh -o "$PHOTON_SCRIPT"
-  chmod +x "$PHOTON_SCRIPT"
-  echo "Saved photon.sh to $PHOTON_SCRIPT"
-  exec "$PHOTON_SCRIPT" "$@"
-fi
-
-# --- Default values ---
+# --- Parse CLI args first ---
 DB_TYPE=""
 COUNTRY_CODE=""
 PHOTON_PORT=""
@@ -23,7 +14,6 @@ LOG_CHOICE=""
 STOP_PHOTON=false
 UNINSTALL_PHOTON=false
 
-# --- Parse CLI arguments ---
 while [[ "$#" -gt 0 ]]; do
   case $1 in
     --db=*) DB_TYPE="${1#*=}";;
@@ -37,13 +27,27 @@ while [[ "$#" -gt 0 ]]; do
   shift
 done
 
-# Prompt only once for DB_TYPE if not passed
+# --- Self-download logic ---
+if [[ "$(realpath "$0")" != "$(realpath "$PHOTON_SCRIPT")" ]]; then
+  mkdir -p "$PHOTON_HOME"
+  curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon.sh -o "$PHOTON_SCRIPT"
+  chmod +x "$PHOTON_SCRIPT"
+  echo "Saved photon.sh to $PHOTON_SCRIPT"
+  exec "$PHOTON_SCRIPT" \
+    ${DB_TYPE:+--db=$DB_TYPE} \
+    ${COUNTRY_CODE:+--country=$COUNTRY_CODE} \
+    ${PHOTON_PORT:+--port=$PHOTON_PORT} \
+    ${LOG_CHOICE:+--log=$LOG_CHOICE} \
+    $([[ "$STOP_PHOTON" == true ]] && echo "--stop") \
+    $([[ "$UNINSTALL_PHOTON" == true ]] && echo "--uninstall")
+fi
+
+# Validate or prompt for DB_TYPE
 while [[ -z "$DB_TYPE" || ( "$DB_TYPE" != "global" && "$DB_TYPE" != "country" ) ]]; do
   echo "What type of database do you want to use? (global/country)"
   read -r DB_TYPE
   DB_TYPE="$(echo "$DB_TYPE" | tr '[:upper:]' '[:lower:]')"
 done
-
 
 # --- Stop ---
 if $STOP_PHOTON; then
@@ -60,7 +64,7 @@ if $UNINSTALL_PHOTON; then
   echo "Photon uninstalled."
   exit 0
 fi
- 
+
 # --- Prompt for log ---
 if [[ -z "$LOG_CHOICE" ]]; then
   echo "Enable logging? (y/n) [default: n]"
@@ -116,7 +120,7 @@ install_dependencies
 
 # --- Download Photon JAR ---
 REPO="komoot/photon"
-LATEST_RELEASE="$(curl -s https://api.github.com/repos/$REPO/releases/latest | grep 'tag_name' | sed -E 's/.*"v?([^"]+)".*/\1/')"
+LATEST_RELEASE="$(curl -s https://api.github.com/repos/$REPO/releases/latest | grep 'tag_name' | sed -E 's/.*"v?([^\"]+)".*/\1/')"
 PHOTON_JAR_URL="https://github.com/$REPO/releases/download/$LATEST_RELEASE/photon-$LATEST_RELEASE.jar"
 
 mkdir -p "$PHOTON_HOME"
@@ -159,7 +163,7 @@ fi
 # --- start.sh ---
 cat << EOF > "$PHOTON_HOME/start.sh"
 #!/bin/bash
-cd "\$(dirname "\$0")"
+cd "\\$(dirname "\$0")"
 nohup java --enable-native-access=ALL-UNNAMED -Xmx4g -jar photon.jar \\
   -data-dir ./ -listen-port $PHOTON_PORT \\
   -default-language en -languages en -cors-any > photon.log 2>&1 &
@@ -186,7 +190,7 @@ chmod +x "$PHOTON_HOME/uninstall.sh"
 
 # --- Output ---
 echo
-echo "🌍 Photon is running at: http://localhost:$PHOTON_PORT"
-echo "▶ Start again: $PHOTON_HOME/start.sh"
-echo "⏹ Stop:        $PHOTON_HOME/stop.sh"
-echo "🗑 Uninstall:   $PHOTON_HOME/uninstall.sh"
+echo "\xf0\x9f\x8c\x8d Photon is running at: http://localhost:$PHOTON_PORT"
+echo "\xe2\x96\xb6 Start again: $PHOTON_HOME/start.sh"
+echo "\xe2\x8f\xb9 Stop:        $PHOTON_HOME/stop.sh"
+echo "\xf0\x9f\x97\x91 Uninstall:   $PHOTON_HOME/uninstall.sh"
