@@ -6,13 +6,27 @@ PHOTON_JAR="$PHOTON_HOME/photon.jar"
 PHOTON_LOG="$PHOTON_HOME/photon.log"
 PHOTON_SCRIPT="$PHOTON_HOME/photon.sh"
 
-
+# Create the directory if it doesn't exist
+echo "Creating directory $PHOTON_HOME"
 mkdir -p "$PHOTON_HOME"
-curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon.sh -o "$PHOTON_SCRIPT"
+
+# Download the setup script
+echo "Downloading setup script"
+wget -O "$PHOTON_SCRIPT" https://raw.githubusercontent.com/icotd/setup/main/photon.sh
+
+# Make the script executable
+echo "Making the script executable"
 chmod +x "$PHOTON_SCRIPT"
 
-# run the script
-bash "$PHOTON_SCRIPT"
+# Change to the photon directory
+echo "Changing to the photon directory"
+cd "$PHOTON_HOME" || { echo "Failed to cd into $PHOTON_HOME"; exit 1; }
+
+# Run the script from inside the directory
+echo "Running the script"
+./photon.sh
+
+echo "Script completed"
 
 
 # --- Default values ---
