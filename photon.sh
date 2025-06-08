@@ -144,9 +144,19 @@ else
   download_country_db() {
     country="$1"
     COUNTRY_DB="https://download1.graphhopper.com/public/extracts/by-country-code/${country}/photon-db-${country}-latest.tar.bz2"
-    echo "➡ $country"
-    wget -q -O - "$COUNTRY_DB" | pbzip2 -cd | tar x 2>/dev/null && echo "✅ $country done" || echo "⚠️ Failed $country"
+    echo "➡ Downloading: $country"
+    
+    tmpfile=$(mktemp)
+    
+    if wget --show-progress -O "$tmpfile" "$COUNTRY_DB"; then
+      pbzip2 -cd "$tmpfile" | tar x && echo "✅ Extracted: $country"
+    else
+      echo "⚠️ Failed: $country"
+    fi
+    
+    rm -f "$tmpfile"
   }
+
 
   export -f download_country_db
 
