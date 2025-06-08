@@ -97,10 +97,10 @@ install_dependencies() {
     fi
     echo "Detected Linux: $DISTRO"
     case "$DISTRO" in
-      ubuntu|debian) sudo apt update && sudo apt install -y default-jdk pbzip2 wget curl ;;
-      fedora) sudo dnf install -y java-11-openjdk pbzip2 wget curl ;;
-      centos|rhel) sudo yum install -y java-11-openjdk pbzip2 wget curl ;;
-      alpine) sudo apk add --no-cache openjdk11 pbzip2 wget curl ;;
+      ubuntu|debian) sudo apt update && sudo apt install -y default-jdk pbzip2 wget curl xargs ;;
+      fedora) sudo dnf install -y java-11-openjdk pbzip2 wget curl findutils ;;
+      centos|rhel) sudo yum install -y java-11-openjdk pbzip2 wget curl findutils ;;
+      alpine) sudo apk add --no-cache openjdk11 pbzip2 wget curl findutils ;;
       *) echo "Unsupported distro: $DISTRO"; exit 1 ;;
     esac
   else
@@ -126,20 +126,9 @@ fi
 
 # --- Download database ---
 ALL_COUNTRIES=(
-  "ae" "af" "am" "ao" "at" "au" "az" "ba" "bd" "be" "bf" "bg" "bh"
-  "bi" "bj" "bn" "bo" "bt" "bw" "by" "bz" "ca" "cd" "cf" "cg" "ch"
-  "ci" "cl" "cm" "co" "cr" "cu" "cv" "cy" "cz" "de" "dj" "dk" "do"
-  "dz" "ec" "ee" "eg" "er" "es" "et" "fi" "fr" "ga" "gb" "ge" "gh"
-  "gm" "gn" "gq" "gr" "gt" "gw" "gy" "hn" "hr" "hu" "id" "ie" "il"
-  "iq" "ir" "is" "it" "jo" "jp" "ke" "kg" "kh" "km" "kp" "kr" "kw"
-  "la" "lb" "lk" "lr" "ls" "lt" "lu" "lv" "ly" "ma" "md" "me" "mg"
-  "mk" "ml" "mm" "mn" "mr" "mu" "mv" "mw" "mx" "my" "mz" "na" "ne"
-  "ng" "ni" "nl" "no" "np" "om" "pa" "pe" "pg" "ph" "pk" "pl" "ps"
-  "pt" "py" "qa" "ro" "rs" "rw" "sa" "sd" "se" "sg" "si" "sk" "sl"
-  "sn" "so" "sr" "ss" "st" "sv" "sy" "sz" "td" "tg" "th" "tj" "tl"
-  "tm" "tn" "tr" "tw" "tz" "ua" "ug" "us" "uy" "uz" "ve" "vn" "ye"
-  "za" "zm" "zw"
+  "mc" "gi" "bm" "sm" "gg" "je" "li" "mh" "ck" "kn" "ky" "mv" "mt" "gd" "vc" "bb" "sc" "ad" "lc" "fm" "sg" "to" "dm" "bh" "tc" "st" "fo" "km" "mu" "lu" "ws" "cv" "tt" "bn" "ps" "cy" "lb" "xk" "jm" "gm" "qa" "fk" "vu" "me" "bs" "tl" "sz" "kw" "fj" "si" "sv" "il" "bz" "dj" "mk" "rw" "ht" "bi" "gq" "al" "sb" "am" "ls" "be" "md" "gw" "tw" "bt" "ch" "nl" "dk" "ee" "do" "sk" "cr" "ba" "hr" "tg" "lv" "lt" "lk" "ge" "ie" "sl" "pa" "rs" "cz" "at" "az" "jo" "pt" "hu" "kr" "is" "gt" "cu" "bg" "lr" "hn" "bj" "er" "mw" "kp" "ni" "gr" "tj" "np" "bd" "tn" "sr" "uy" "kh" "sy" "kg" "sn" "by" "gy" "la" "ro" "gh" "ug" "gb" "gn" "ga" "nz" "bf" "ec" "ph" "it" "om" "pl" "ci" "my" "vn" "fi" "cg" "de" "jp" "no" "zw" "py" "uz" "iq" "ma" "se" "pg" "tm" "cm" "es" "th" "ye" "bw" "ke" "mg" "ua" "ss" "cf" "so" "fr" "mm" "cl" "zm" "tr" "mz" "na" "pk" "ve" "ng" "tz" "eg" "mr" "bo" "et" "co" "za" "ml" "ao" "ne" "td" "pe" "mn" "ir" "ly" "sd" "id" "mx" "sa" "cd" "dz" "au" "us" "ca"
 )
+
 
 if [[ "$DB_TYPE" == "country" ]]; then
   if [[ -z "$COUNTRY_CODE" ]]; then
@@ -150,12 +139,18 @@ if [[ "$DB_TYPE" == "country" ]]; then
   echo "Downloading country DB ($COUNTRY_CODE)..."
   wget -O - "$COUNTRY_DB" | pbzip2 -cd | tar x
 else
-  echo "Downloading all country DBs (global alternative)..."
-  for country in "${ALL_COUNTRIES[@]}"; do
+  echo "Downloading all country DBs (global alternative) in parallel..."
+
+  download_country_db() {
+    country="$1"
     COUNTRY_DB="https://download1.graphhopper.com/public/extracts/by-country-code/${country}/photon-db-${country}-latest.tar.bz2"
-    echo "➡ $country..."
-    wget -O - "$COUNTRY_DB" | pbzip2 -cd | tar x || echo "⚠️ Failed to download $country"
-  done
+    echo "➡ $country"
+    wget -q -O - "$COUNTRY_DB" | pbzip2 -cd | tar x 2>/dev/null && echo "✅ $country done" || echo "⚠️ Failed $country"
+  }
+
+  export -f download_country_db
+
+  printf "%s\n" "${ALL_COUNTRIES[@]}" | xargs -n 1 -P 8 -I {} bash -c 'download_country_db "$@"' _ {}
 fi
 
 # --- Start server ---
