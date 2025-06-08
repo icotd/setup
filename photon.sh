@@ -6,6 +6,7 @@ PHOTON_JAR="$PHOTON_HOME/photon.jar"
 PHOTON_LOG="$PHOTON_HOME/photon.log"
 PHOTON_SCRIPT="$PHOTON_HOME/photon.sh"
  
+
 # --- Default values ---
 DB_TYPE=""
 COUNTRY_CODE=""
