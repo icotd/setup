@@ -1,7 +1,9 @@
 ```
 curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon.sh | bash
 ```
-
+```
+curl -sLS https://raw.githubusercontent.com/icotd/setup/main/install_photon.sh.sh | sh
+```
 ```
 curl -sL https://raw.githubusercontent.com/icotd/setup/main/photon.sh -o setup_photon.sh
 chmod +x setup_photon.sh
