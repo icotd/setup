@@ -125,9 +125,21 @@ else
 fi
 
 # --- Download database ---
+# ALL_COUNTRIES=(
+#   "mc" "gi" "bm" "sm" "gg" "je" "li" "mh" "ck" "kn" "ky" "mv" "mt" "gd" "vc" "bb" "sc" "ad" "lc" "fm" "sg" "to" "dm" "bh" "tc" "st" "fo" "km" "mu" "lu" "ws" "cv" "tt" "bn" "ps" "cy" "lb" "xk" "jm" "gm" "qa" "fk" "vu" "me" "bs" "tl" "sz" "kw" "fj" "si" "sv" "il" "bz" "dj" "mk" "rw" "ht" "bi" "gq" "al" "sb" "am" "ls" "be" "md" "gw" "tw" "bt" "ch" "nl" "dk" "ee" "do" "sk" "cr" "ba" "hr" "tg" "lv" "lt" "lk" "ge" "ie" "sl" "pa" "rs" "cz" "at" "az" "jo" "pt" "hu" "kr" "is" "gt" "cu" "bg" "lr" "hn" "bj" "er" "mw" "kp" "ni" "gr" "tj" "np" "bd" "tn" "sr" "uy" "kh" "sy" "kg" "sn" "by" "gy" "la" "ro" "gh" "ug" "gb" "gn" "ga" "nz" "bf" "ec" "ph" "it" "om" "pl" "ci" "my" "vn" "fi" "cg" "de" "jp" "no" "zw" "py" "uz" "iq" "ma" "se" "pg" "tm" "cm" "es" "th" "ye" "bw" "ke" "mg" "ua" "ss" "cf" "so" "fr" "mm" "cl" "zm" "tr" "mz" "na" "pk" "ve" "ng" "tz" "eg" "mr" "bo" "et" "co" "za" "ml" "ao" "ne" "td" "pe" "mn" "ir" "ly" "sd" "id" "mx" "sa" "cd" "dz" "au" "us" "ca"
+# )
+
 ALL_COUNTRIES=(
-  "mc" "gi" "bm" "sm" "gg" "je" "li" "mh" "ck" "kn" "ky" "mv" "mt" "gd" "vc" "bb" "sc" "ad" "lc" "fm" "sg" "to" "dm" "bh" "tc" "st" "fo" "km" "mu" "lu" "ws" "cv" "tt" "bn" "ps" "cy" "lb" "xk" "jm" "gm" "qa" "fk" "vu" "me" "bs" "tl" "sz" "kw" "fj" "si" "sv" "il" "bz" "dj" "mk" "rw" "ht" "bi" "gq" "al" "sb" "am" "ls" "be" "md" "gw" "tw" "bt" "ch" "nl" "dk" "ee" "do" "sk" "cr" "ba" "hr" "tg" "lv" "lt" "lk" "ge" "ie" "sl" "pa" "rs" "cz" "at" "az" "jo" "pt" "hu" "kr" "is" "gt" "cu" "bg" "lr" "hn" "bj" "er" "mw" "kp" "ni" "gr" "tj" "np" "bd" "tn" "sr" "uy" "kh" "sy" "kg" "sn" "by" "gy" "la" "ro" "gh" "ug" "gb" "gn" "ga" "nz" "bf" "ec" "ph" "it" "om" "pl" "ci" "my" "vn" "fi" "cg" "de" "jp" "no" "zw" "py" "uz" "iq" "ma" "se" "pg" "tm" "cm" "es" "th" "ye" "bw" "ke" "mg" "ua" "ss" "cf" "so" "fr" "mm" "cl" "zm" "tr" "mz" "na" "pk" "ve" "ng" "tz" "eg" "mr" "bo" "et" "co" "za" "ml" "ao" "ne" "td" "pe" "mn" "ir" "ly" "sd" "id" "mx" "sa" "cd" "dz" "au" "us" "ca"
+  "mv" "sg" "bh" "st" "km" "mu" "lu" "cv" "bn" "ps" "cy" "lb" "gm" "qa" "me" "tl" "sz" "kw" "si" "sv"
+  "il" "bz" "dj" "mk" "rw" "bi" "gq" "am" "ls" "be" "md" "gw" "tw" "bt" "ch" "nl" "dk" "ee" "do" "sk"
+  "cr" "ba" "hr" "tg" "lv" "lt" "lk" "ge" "ie" "sl" "pa" "rs" "cz" "at" "az" "jo" "pt" "hu" "kr" "is"
+  "gt" "cu" "bg" "lr" "hn" "bj" "er" "mw" "kp" "ni" "gr" "tj" "np" "bd" "tn" "sr" "uy" "kh" "sy" "kg"
+  "sn" "by" "gy" "la" "ro" "gh" "ug" "gb" "gn" "ga" "bf" "ec" "ph" "it" "om" "pl" "ci" "my" "vn" "fi"
+  "cg" "de" "jp" "no" "zw" "py" "uz" "iq" "ma" "se" "pg" "tm" "cm" "es" "th" "ye" "bw" "ke" "mg" "ua"
+  "ss" "cf" "so" "fr" "mm" "cl" "zm" "tr" "mz" "na" "pk" "ve" "ng" "tz" "eg" "mr" "bo" "et" "co" "za"
+  "ml" "ao" "ne" "td" "pe" "mn" "ir" "ly" "sd" "id" "mx" "sa" "cd" "dz" "au" "us" "ca"
 )
+
 
 
 if [[ "$DB_TYPE" == "country" ]]; then
