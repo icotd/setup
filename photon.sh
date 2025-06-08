@@ -5,7 +5,6 @@ PHOTON_HOME="$HOME/photon"
 PHOTON_JAR="$PHOTON_HOME/photon.jar"
 PHOTON_LOG="$PHOTON_HOME/photon.log"
 PHOTON_SCRIPT="$PHOTON_HOME/photon.sh"
- 
 
 # --- Default values ---
 DB_TYPE=""
@@ -41,7 +40,6 @@ if [[ "$DB_TYPE" != "global" && "$DB_TYPE" != "country" ]]; then
   exit 1
 fi
 
-
 # --- Stop ---
 if $STOP_PHOTON; then
   echo "Stopping Photon server..."
@@ -57,7 +55,7 @@ if $UNINSTALL_PHOTON; then
   echo "Photon uninstalled."
   exit 0
 fi
- 
+
 # --- Prompt for log ---
 if [[ -z "$LOG_CHOICE" ]]; then
   echo "Enable logging? (y/n) [default: n]"
@@ -127,15 +125,37 @@ else
 fi
 
 # --- Download database ---
-GLOBAL_DB="https://download1.graphhopper.com/public/photon-db-latest.tar.bz2"
-COUNTRY_DB="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest.tar.bz2"
+ALL_COUNTRIES=(
+  "ae" "af" "am" "ao" "at" "au" "az" "ba" "bd" "be" "bf" "bg" "bh"
+  "bi" "bj" "bn" "bo" "bt" "bw" "by" "bz" "ca" "cd" "cf" "cg" "ch"
+  "ci" "cl" "cm" "co" "cr" "cu" "cv" "cy" "cz" "de" "dj" "dk" "do"
+  "dz" "ec" "ee" "eg" "er" "es" "et" "fi" "fr" "ga" "gb" "ge" "gh"
+  "gm" "gn" "gq" "gr" "gt" "gw" "gy" "hn" "hr" "hu" "id" "ie" "il"
+  "iq" "ir" "is" "it" "jo" "jp" "ke" "kg" "kh" "km" "kp" "kr" "kw"
+  "la" "lb" "lk" "lr" "ls" "lt" "lu" "lv" "ly" "ma" "md" "me" "mg"
+  "mk" "ml" "mm" "mn" "mr" "mu" "mv" "mw" "mx" "my" "mz" "na" "ne"
+  "ng" "ni" "nl" "no" "np" "om" "pa" "pe" "pg" "ph" "pk" "pl" "ps"
+  "pt" "py" "qa" "ro" "rs" "rw" "sa" "sd" "se" "sg" "si" "sk" "sl"
+  "sn" "so" "sr" "ss" "st" "sv" "sy" "sz" "td" "tg" "th" "tj" "tl"
+  "tm" "tn" "tr" "tw" "tz" "ua" "ug" "us" "uy" "uz" "ve" "vn" "ye"
+  "za" "zm" "zw"
+)
 
 if [[ "$DB_TYPE" == "country" ]]; then
+  if [[ -z "$COUNTRY_CODE" ]]; then
+    echo "Please specify a country code with --country=XX"
+    exit 1
+  fi
+  COUNTRY_DB="https://download1.graphhopper.com/public/extracts/by-country-code/${COUNTRY_CODE}/photon-db-${COUNTRY_CODE}-latest.tar.bz2"
   echo "Downloading country DB ($COUNTRY_CODE)..."
   wget -O - "$COUNTRY_DB" | pbzip2 -cd | tar x
 else
-  echo "Downloading global DB..."
-  wget -O - "$GLOBAL_DB" | pbzip2 -cd | tar x
+  echo "Downloading all country DBs (global alternative)..."
+  for country in "${ALL_COUNTRIES[@]}"; do
+    COUNTRY_DB="https://download1.graphhopper.com/public/extracts/by-country-code/${country}/photon-db-${country}-latest.tar.bz2"
+    echo "➡ $country..."
+    wget -O - "$COUNTRY_DB" | pbzip2 -cd | tar x || echo "⚠️ Failed to download $country"
+  done
 fi
 
 # --- Start server ---
