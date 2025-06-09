@@ -3,29 +3,37 @@
 # Exit immediately if a command exits with a non-zero status
 set -e
 
-# Define base directory
+# Define constants
 WORK_DIR="$HOME/osrm"
+OSM_URL="http://download.geofabrik.de/africa/ethiopia-latest.osm.pbf"
 OSM_FILE="ethiopia-latest.osm.pbf"
 OSRM_BASE="ethiopia-latest.osrm"
-PROFILE="/opt/car.lua"  # You can change this if needed
+PROFILE="/opt/car.lua"  # Adjust if needed
 
-# Create the directory if it doesn't exist
+# Step 1: Create working directory
 mkdir -p "$WORK_DIR"
+cd "$WORK_DIR"
 
-# Check if the OSM file exists
-if [ ! -f "$WORK_DIR/$OSM_FILE" ]; then
-  echo "❌ OSM file '$OSM_FILE' not found in '$WORK_DIR'. Please place it there before running the script."
-  exit 1
+# Step 2: Download the OSM file if it doesn't exist
+if [ ! -f "$OSM_FILE" ]; then
+  echo "📥 Downloading OSM file to $WORK_DIR..."
+  curl -O "$OSM_URL"
+else
+  echo "✅ OSM file already exists, skipping download."
 fi
 
-echo "🔧 Step 1: Extracting with car profile..."
+# Step 3: Extract
+echo "🔧 Extracting with car profile..."
 docker run -t -v "$WORK_DIR:/data" osrm/osrm-backend osrm-extract -p "$PROFILE" "/data/$OSM_FILE"
 
-echo "🧩 Step 2: Partitioning..."
+# Step 4: Partition
+echo "🧩 Partitioning..."
 docker run -t -v "$WORK_DIR:/data" osrm/osrm-backend osrm-partition "/data/$OSRM_BASE"
 
-echo "🎛️ Step 3: Customizing..."
+# Step 5: Customize
+echo "🎛️ Customizing..."
 docker run -t -v "$WORK_DIR:/data" osrm/osrm-backend osrm-customize "/data/$OSRM_BASE"
 
-echo "🚀 Step 4: Starting OSRM routing engine on port 5001..."
+# Step 6: Start OSRM routing engine
+echo "🚀 Starting OSRM routing engine on port 5001..."
 docker run -d -p 5001:5000 -v "$WORK_DIR:/data" osrm/osrm-backend osrm-routed --algorithm mld "/data/$OSRM_BASE"
