@@ -2,6 +2,9 @@
 curl -sLS https://raw.githubusercontent.com/icotd/setup/main/photon.sh | bash
 ```
 ```
+curl -sLS https://raw.githubusercontent.com/icotd/setup/main/osrm.sh | bash
+```
+```
 curl -sLS https://raw.githubusercontent.com/icotd/setup/main/install_photon.sh.sh | sh
 ```
 ```
