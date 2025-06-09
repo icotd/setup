@@ -1,39 +1,37 @@
 #!/bin/bash
-
-# Exit immediately if a command exits with a non-zero status
 set -e
 
 # Define constants
-WORK_DIR="$HOME/osrm"
+OSRM_DIR="$HOME/osrm"
 OSM_URL="http://download.geofabrik.de/africa/ethiopia-latest.osm.pbf"
-OSM_FILE="ethiopia-latest.osm.pbf"
+OSM_FILENAME="ethiopia-latest.osm.pbf"
+OSM_FILE="$OSRM_DIR/$OSM_FILENAME"
 OSRM_BASE="ethiopia-latest.osrm"
-PROFILE="/opt/car.lua"  # Adjust if needed
+PROFILE="/opt/car.lua"  # Update this path if needed
 
-# Step 1: Create working directory
-mkdir -p "$WORK_DIR"
-cd "$WORK_DIR"
+# Resolve absolute path
+OSRM_DIR_ABS="$(mkdir -p "$OSRM_DIR" && cd "$OSRM_DIR" && pwd)"
 
-# Step 2: Download the OSM file if it doesn't exist
+# Step 2: Download OSM file if missing
 if [ ! -f "$OSM_FILE" ]; then
-  echo "📥 Downloading OSM file to $WORK_DIR..."
-  curl -O "$OSM_URL"
+  echo "📥 Downloading OSM file using wget..."
+  wget -O "$OSM_FILE" "$OSM_URL"
 else
   echo "✅ OSM file already exists, skipping download."
 fi
 
 # Step 3: Extract
 echo "🔧 Extracting with car profile..."
-docker run -t -v "$WORK_DIR:/data" osrm/osrm-backend osrm-extract -p "$PROFILE" "/data/$OSM_FILE"
+docker run -t -v "$OSRM_DIR_ABS:/data" osrm/osrm-backend osrm-extract -p "$PROFILE" "/data/$OSM_FILENAME"
 
 # Step 4: Partition
 echo "🧩 Partitioning..."
-docker run -t -v "$WORK_DIR:/data" osrm/osrm-backend osrm-partition "/data/$OSRM_BASE"
+docker run -t -v "$OSRM_DIR_ABS:/data" osrm/osrm-backend osrm-partition "/data/$OSRM_BASE"
 
 # Step 5: Customize
 echo "🎛️ Customizing..."
-docker run -t -v "$WORK_DIR:/data" osrm/osrm-backend osrm-customize "/data/$OSRM_BASE"
+docker run -t -v "$OSRM_DIR_ABS:/data" osrm/osrm-backend osrm-customize "/data/$OSRM_BASE"
 
-# Step 6: Start OSRM routing engine
+# Step 6: Start routing engine
 echo "🚀 Starting OSRM routing engine on port 5001..."
-docker run -d -p 5001:5000 -v "$WORK_DIR:/data" osrm/osrm-backend osrm-routed --algorithm mld "/data/$OSRM_BASE"
+docker run -d -p 5001:5000 -v "$OSRM_DIR_ABS:/data" osrm/osrm-backend osrm-routed --algorithm mld "/data/$OSRM_BASE"
