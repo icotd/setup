@@ -1,10 +1,6 @@
-#!/usr/bin/env bash
-# ============================================================
-#  Universal OpenRouteService installer – Ethiopia (car only)
-#  Supports: macOS, Debian/Ubuntu, RedHat/Fedora/CentOS, Alpine
-#  Installs into ~/ors for the invoking user
-# ============================================================
+#!/bin/bash
 set -euo pipefail
+
 
 ######################## 1. Detect platform ########################
 KERNEL=$(uname -s)
@@ -39,12 +35,12 @@ if [[ "$OS_FAMILY" != "mac" && "$EUID" -ne 0 ]]; then
 fi
 
 ######################## 3. Dependency check ########################
-declare -A PKGS
-PKGS[apt]="openjdk-17-jdk maven git curl unzip"
-PKGS[dnf]="java-17-openjdk-devel maven git curl unzip"
-PKGS[yum]="${PKGS[dnf]}"
-PKGS[apk]="openjdk17 maven git curl unzip"
-PKGS[brew]="openjdk@17 maven git curl unzip"
+PKGS_apt="openjdk-17-jdk maven git curl unzip"
+PKGS_dnf="java-17-openjdk-devel maven git curl unzip"
+PKGS_yum="$PKGS_dnf"
+PKGS_apk="openjdk17 maven git curl unzip"
+PKGS_brew="openjdk@17 maven git curl unzip"
+
 
 NEEDED_CMDS=(java mvn git curl unzip)
 MISSING_CMDS=()
@@ -63,7 +59,7 @@ else
       DEBIAN_FRONTEND=noninteractive apt-get install -y ${PKGS[apt]}
       ;;
     dnf|yum)
-      "$PKG_MGR" -y install ${PKGS[$PKG_MGR]}
+      eval "$PKG_MGR install \${PKGS_$PKG_MGR}"
       ;;
     apk)
       apk add --no-cache ${PKGS[apk]}
