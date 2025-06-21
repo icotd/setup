@@ -1,37 +1,43 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Define constants
 OSRM_DIR="$HOME/osrm"
-OSM_URL="http://download.geofabrik.de/africa/ethiopia-latest.osm.pbf"
-OSM_FILENAME="ethiopia-latest.osm.pbf"
-OSM_FILE="$OSRM_DIR/$OSM_FILENAME"
-OSRM_BASE="ethiopia-latest.osrm"
-PROFILE="/opt/car.lua"  # Update this path if needed
+OSM_URL="https://download.geofabrik.de/africa/ethiopia-latest.osm.pbf"
+OSM_FILENAME="$(basename "$OSM_URL")"          # ethiopia-latest.osm.pbf
+BASE="${OSM_FILENAME%.osm.pbf}"                # ethiopia-latest
+OSRM_BASE="${BASE}.osrm"                       # ethiopia-latest.osrm
+OSRM_IMAGE="osrm/osrm-backend:latest"
 
-# Resolve absolute path
-OSRM_DIR_ABS="$(mkdir -p "$OSRM_DIR" && cd "$OSRM_DIR" && pwd)"
+mkdir -p "$OSRM_DIR"
+cd "$OSRM_DIR"
 
-# Step 2: Download OSM file if missing
-if [ ! -f "$OSM_FILE" ]; then
-  echo "📥 Downloading OSM file using wget..."
-  wget -O "$OSM_FILE" "$OSM_URL"
+# 1. Download extract
+if [ ! -f "$OSM_FILENAME" ]; then
+  echo "📥 Downloading $OSM_FILENAME …"
+  wget -q --show-progress "$OSM_URL"
 else
-  echo "✅ OSM file already exists, skipping download."
+  echo "✅ OSM extract exists – skipping download"
 fi
 
-# Step 3: Extract
-echo "🔧 Extracting with car profile..."
-docker run -t -v "$OSRM_DIR_ABS:/data" osrm/osrm-backend osrm-extract -p "$PROFILE" "/data/$OSM_FILENAME"
+# 2. Extract
+echo "🔧 osrm-extract …"
+docker run --rm -t -v "$PWD:/data" "$OSRM_IMAGE" \
+  osrm-extract -p /opt/car.lua "/data/$OSM_FILENAME"
 
-# Step 4: Partition
-echo "🧩 Partitioning..."
-docker run -t -v "$OSRM_DIR_ABS:/data" osrm/osrm-backend osrm-partition "/data/$OSRM_BASE"
+# 3. Partition
+echo "🧩 osrm-partition …"
+docker run --rm -t -v "$PWD:/data" "$OSRM_IMAGE" \
+  osrm-partition "/data/$OSRM_BASE"
 
-# Step 5: Customize
-echo "🎛️ Customizing..."
-docker run -t -v "$OSRM_DIR_ABS:/data" osrm/osrm-backend osrm-customize "/data/$OSRM_BASE"
+# 4. Customise
+echo "🎛️ osrm-customize …"
+docker run --rm -t -v "$PWD:/data" "$OSRM_IMAGE" \
+  osrm-customize "/data/$OSRM_BASE"
 
-# Step 6: Start routing engine
-echo "🚀 Starting OSRM routing engine on port 5001..."
-docker run -d -p 5001:5000 -v "$OSRM_DIR_ABS:/data" osrm/osrm-backend osrm-routed --algorithm mld "/data/$OSRM_BASE"
+# 5. Run
+echo "🚀 Launching OSRM on :5001 …"
+docker run -d --rm --name osrm-ethiopia \
+  -p 5001:5000 \
+  -v "$PWD:/data" \
+  "$OSRM_IMAGE" \
+  osrm-routed --algorithm mld "/data/$OSRM_BASE"
