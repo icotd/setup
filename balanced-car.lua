@@ -1,3 +1,6 @@
+local find = string.find
+
+-- Provide OSRM routing mode mapping
 local mode = {
   driving = 1
 }
@@ -55,7 +58,7 @@ function setup()
 end
 
 function process_node(profile, node, result)
-  -- Needed by OSRM, even if unused
+  -- Required stub, can be expanded to block barriers or access later
 end
 
 function process_way(profile, way, result)
@@ -64,7 +67,8 @@ function process_way(profile, way, result)
 
   local speed = profile.speeds[highway]
   if not speed then
-    print("⚠️  Unknown highway type: " .. highway)
+    -- Uncomment to debug unknown highways
+    -- print("⚠️  Unknown highway type: " .. highway)
     return
   end
 
@@ -84,7 +88,7 @@ function process_way(profile, way, result)
 end
 
 function process_turn(profile, turn)
-  local angle = math.abs(turn.angle)
+  local angle = math.abs(turn.angle or 0)
   turn.duration = profile.properties.turn_penalty * (angle / 90.0)
 
   if turn.has_traffic_light then
