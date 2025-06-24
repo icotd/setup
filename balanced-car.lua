@@ -55,26 +55,32 @@ end
 
 function process_way(profile, way, result)
   local highway = way:get_value_by_key("highway")
-  if not highway or not profile.speeds[highway] then
+
+  if not highway then
     return
   end
 
   local speed = profile.speeds[highway]
-
-  -- Modify speed by surface, if available
-  local surface = way:get_value_by_key("surface")
-  if surface and profile.surface_speeds[surface] then
-    speed = speed * profile.surface_speeds[surface]
+  if not speed then
+    print("⚠️  Unknown highway type: " .. highway)
+    return
   end
 
-  -- Ensure speed is not too low
-  if speed < 1 then speed = 1 end
-
+  result.name = way:get_value_by_key("name") or ""
   result.forward_mode = profile.default_mode
   result.backward_mode = profile.default_mode
   result.forward_speed = speed
   result.backward_speed = speed
+
+  -- Surface adjustments
+  local surface = way:get_value_by_key("surface")
+  if surface and profile.surface_speeds[surface] then
+    local factor = profile.surface_speeds[surface]
+    result.forward_speed = result.forward_speed * factor
+    result.backward_speed = result.backward_speed * factor
+  end
 end
+
 
 function process_turn(profile, turn)
   local angle = math.abs(turn.angle)
