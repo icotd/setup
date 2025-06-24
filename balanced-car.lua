@@ -1,5 +1,6 @@
--- balanced-car.lua
--- A realistic routing profile for OSRM with safer defaults for Ethiopia
+local mode = {
+  driving = 1
+}
 
 function setup()
   return {
@@ -53,12 +54,13 @@ function setup()
   }
 end
 
+function process_node(profile, node, result)
+  -- Needed by OSRM, even if unused
+end
+
 function process_way(profile, way, result)
   local highway = way:get_value_by_key("highway")
-
-  if not highway then
-    return
-  end
+  if not highway then return end
 
   local speed = profile.speeds[highway]
   if not speed then
@@ -71,8 +73,8 @@ function process_way(profile, way, result)
   result.backward_mode = profile.default_mode
   result.forward_speed = speed
   result.backward_speed = speed
+  result.is_valid = true
 
-  -- Surface adjustments
   local surface = way:get_value_by_key("surface")
   if surface and profile.surface_speeds[surface] then
     local factor = profile.surface_speeds[surface]
@@ -80,7 +82,6 @@ function process_way(profile, way, result)
     result.backward_speed = result.backward_speed * factor
   end
 end
-
 
 function process_turn(profile, turn)
   local angle = math.abs(turn.angle)
