@@ -1,4 +1,7 @@
 ```
+curl -sLS https://raw.githubusercontent.com/icotd/setup/main/docker-calima.sh | bash
+```
+```
 curl -sL https://raw.githubusercontent.com/icotd/setup/main/ors.sh -o setup_ors.sh
 chmod +x setup_ors.sh
 ./setup_ors.sh
