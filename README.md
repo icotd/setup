@@ -1,5 +1,5 @@
 ```
-curl -sLS https://raw.githubusercontent.com/icotd/setup/main/docker-calima.sh | bash
+curl -sLS https://raw.githubusercontent.com/icotd/setup/main/docker-colima.sh | bash
 ```
 ```
 curl -sL https://raw.githubusercontent.com/icotd/setup/main/ors.sh -o setup_ors.sh
