@@ -1,0 +1,25 @@
+tileset:
+  layers:
+    - layers/boundary/boundary.yaml
+    - layers/park/park.yaml
+    - layers/transportation/transportation.yaml
+    - layers/transportation_name/transportation_name.yaml
+    - layers/place/place.yaml
+    - layers/poi/poi.yaml
+  name: OpenMapTiles
+  version: 3.15.0
+  id: openmaptiles
+  description: "Garigo Tileset for Addis Ababa."
+  attribution: 'GariGio'
+  center: [38.75, 9.03, 10]
+  bounds: [38.65, 8.95, 38.85, 9.15]
+  maxzoom: 18
+  minzoom: 10
+  pixel_scale: 256
+  languages:
+    - en
+  defaults:
+    srs: "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=38.75 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over"
+    language: en
+    datasource:
+      srid: 3857
