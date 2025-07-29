@@ -23,7 +23,7 @@ fi
 # 2. Extract Addis Ababa from full Ethiopia file
 if [ ! -f "$EXTRACT_FILENAME" ]; then
   echo "📦 Extracting Addis Ababa bbox to $EXTRACT_FILENAME …"
-  osmium extract -b 38.65,8.95,38.85,9.15 \
+  osmium extract -b 38.525440,8.803691,38.987552,9.207208 \
     -o "$EXTRACT_FILENAME" \
     "$OSM_FILENAME"
 else
