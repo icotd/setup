@@ -1,5 +1,5 @@
 ```
-curl -sLS https://raw.githubusercontent.com/icotd/setup/main/osrm-server.sh | bash
+curl -sLS https://raw.githubusercontent.com/icotd/setup/main/osrm-bbox.sh | bash
 ```
 ```
 curl -sLS https://raw.githubusercontent.com/icotd/setup/main/docker-colima.sh | bash
