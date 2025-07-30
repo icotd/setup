@@ -47,7 +47,7 @@ docker run --rm -t -v "$PWD:/data" "$OSRM_IMAGE" \
 
 # 6. Launch the routing server
 echo "🚀 Launching OSRM for Addis Ababa on :5001 …"
-docker run -d --rm --name osrm-addis \
+docker run -d --rm --name osrm-server --restart unless-stopped \
   -p 5001:5000 \
   -v "$PWD:/data" \
   "$OSRM_IMAGE" \
