@@ -55,3 +55,6 @@ docker run -d \
   "$OSRM_IMAGE" \
   osrm-routed --algorithm mld "/data/$OSRM_BASE"
 
+# 6. Launch the routing server
+echo "🚀 Launching OSRM for Addis Ababa on :5001 …"
+docker run -dt --name vroom --net host -v $PWD/conf:/conf -e VROOM_ROUTER=osrm ghcr.io/vroom-project/vroom-docker:latest 
