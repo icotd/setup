@@ -54,15 +54,4 @@ docker run -d \
   "$OSRM_IMAGE" \
   osrm-routed --algorithm mld "/data/$OSRM_BASE"
 
-### ─────────────────────────────────────────────
-### 8. Launch VROOM server on :5000
-### ─────────────────────────────────────────────
-echo "🚀 Launching VROOM on port 5000…"
-
-docker run -dt --name vroom \
-    --net host \                       # Use host networking (Linux only; on macOS it’s ignored)
-    -v $PWD/conf:/conf \               # Volume for logs/config (optional)
-    -e VROOM_ROUTER=osrm \             # Select routing backend: osrm, valhalla, ors
-    ghcr.io/vroom-project/vroom-docker:v1.14.0
-
-  
+ 
