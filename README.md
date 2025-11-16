@@ -1,4 +1,7 @@
 ```
+curl -sLS https://raw.githubusercontent.com/icotd/setup/main/osrm/osrm-vroom.sh | bash
+```
+```
 curl -sLS https://raw.githubusercontent.com/icotd/setup/main/osrm/run_osrm.sh | bash
 ```
 ```
