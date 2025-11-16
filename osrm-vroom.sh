@@ -1,75 +1,52 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-### ─────────────────────────────────────────────
-### SETTINGS
-### ─────────────────────────────────────────────
 OSRM_DIR="$HOME/osrm"
 OSM_URL="https://download.geofabrik.de/africa/ethiopia-latest.osm.pbf"
-OSM_FILENAME="$(basename "$OSM_URL")"
-EXTRACT_FILENAME="addis-ababa.osm.pbf"
-BASE="addis-ababa"
-OSRM_BASE="${BASE}.osrm"
-
+OSM_FILENAME="$(basename "$OSM_URL")"            # ethiopia-latest.osm.pbf
+EXTRACT_FILENAME="addis-ababa.osm.pbf"           # extracted file
+BASE="addis-ababa"                               
+OSRM_BASE="${BASE}.osrm"                         # addis-ababa.osrm
 OSRM_IMAGE="osrm/osrm-backend:latest"
-VROOM_IMAGE="ghcr.io/vroom-project/vroom-docker:v1.14.0"
- 
 
-# Addis Ababa bounding box
-BBOX="38.525440,8.803691,38.987552,9.207208"
-
-### ─────────────────────────────────────────────
-### PREP
-### ─────────────────────────────────────────────
-mkdir -p "$OSRM_DIR" "$VROOM_DIR"
+mkdir -p "$OSRM_DIR"
 cd "$OSRM_DIR"
 
-### ─────────────────────────────────────────────
-### 1. Download Ethiopia PBF
-### ─────────────────────────────────────────────
+# 1. Download full Ethiopia if needed
 if [ ! -f "$OSM_FILENAME" ]; then
-  echo "📥 Downloading Ethiopia extract…"
+  echo "📥 Downloading $OSM_FILENAME …"
   wget -q --show-progress "$OSM_URL"
 else
-  echo "✅ Ethiopia PBF found — skipping download."
+  echo "✅ OSM extract exists – skipping download"
 fi
 
-### ─────────────────────────────────────────────
-### 2. Extract Addis Ababa subregion
-### ─────────────────────────────────────────────
+# 2. Extract Addis Ababa from full Ethiopia file
 if [ ! -f "$EXTRACT_FILENAME" ]; then
-  echo "📦 Extracting Addis Ababa (bbox)…"
-  osmium extract -b "$BBOX" -o "$EXTRACT_FILENAME" "$OSM_FILENAME"
+  echo "📦 Extracting Addis Ababa bbox to $EXTRACT_FILENAME …"
+  osmium extract -b 38.525440,8.803691,38.987552,9.207208 \
+    -o "$EXTRACT_FILENAME" \
+    "$OSM_FILENAME"
 else
-  echo "✅ Addis Ababa extract exists — skipping."
+  echo "✅ Addis Ababa extract exists – skipping"
 fi
 
-### ─────────────────────────────────────────────
-### 3. OSRM Extract
-### ─────────────────────────────────────────────
-echo "🔧 Running osrm-extract…"
+# 3. osrm-extract
+echo "🔧 osrm-extract …"
 docker run --rm -t -v "$PWD:/data" "$OSRM_IMAGE" \
   osrm-extract -p /opt/car.lua "/data/$EXTRACT_FILENAME"
 
-### ─────────────────────────────────────────────
-### 4. OSRM Partition
-### ─────────────────────────────────────────────
-echo "🧩 Running osrm-partition…"
+# 4. osrm-partition
+echo "🧩 osrm-partition …"
 docker run --rm -t -v "$PWD:/data" "$OSRM_IMAGE" \
   osrm-partition "/data/$OSRM_BASE"
 
-### ─────────────────────────────────────────────
-### 5. OSRM Customize
-### ─────────────────────────────────────────────
-echo "🎛️ Running osrm-customize…"
+# 5. osrm-customize
+echo "🎛️ osrm-customize …"
 docker run --rm -t -v "$PWD:/data" "$OSRM_IMAGE" \
   osrm-customize "/data/$OSRM_BASE"
 
-### ─────────────────────────────────────────────
-### 6. Launch OSRM server on :5001
-### ─────────────────────────────────────────────
-echo "🚀 Launching OSRM on port 5000…"
-docker rm -f osrm-server >/dev/null 2>&1 || true
+# 6. Launch the routing server
+echo "🚀 Launching OSRM for Addis Ababa on :5001 …"
 docker run -d \
   --name osrm-server \
   --restart unless-stopped \
@@ -77,28 +54,15 @@ docker run -d \
   "$OSRM_IMAGE" \
   osrm-routed --algorithm mld "/data/$OSRM_BASE"
 
-echo "✅ OSRM server running → http://localhost:5000/route/v1/driving/…"
- 
-
 ### ─────────────────────────────────────────────
-### 8. Launch VROOM server on :5002
+### 8. Launch VROOM server on :5000
 ### ─────────────────────────────────────────────
 echo "🚀 Launching VROOM on port 5000…"
 
 docker run -dt --name vroom \
-    --restart unless-stopped \
-    --net host \  # or set the container name as host in config.yml and use --port 3000:3000 instead, see below
-    -v $PWD/conf:/conf \ # mapped volume for config & log
-    -e VROOM_ROUTER=osrm \ # routing layer: osrm, valhalla or ors
+    --net host \                       # Use host networking (Linux only; on macOS it’s ignored)
+    -v $PWD/conf:/conf \               # Volume for logs/config (optional)
+    -e VROOM_ROUTER=osrm \             # Select routing backend: osrm, valhalla, ors
     ghcr.io/vroom-project/vroom-docker:v1.14.0
 
-echo "✅ VROOM running → http://localhost:5000"
-
-### ─────────────────────────────────────────────
-### DONE
-### ─────────────────────────────────────────────
-echo ""
-echo "🎉 OSRM + VROOM fully deployed!"
-echo "   OSRM  : http://localhost:5001"
-echo "   VROOM : http://localhost:5002"
-echo ""
+  
