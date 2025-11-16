@@ -13,7 +13,7 @@ OSRM_BASE="${BASE}.osrm"
 
 OSRM_IMAGE="osrm/osrm-backend:latest"
 VROOM_IMAGE="ghcr.io/vroom-project/vroom-docker:v1.14.0"
-VROOM_DIR="$OSRM_DIR/vroom-conf"
+ 
 
 # Addis Ababa bounding box
 BBOX="38.525440,8.803691,38.987552,9.207208"
@@ -68,44 +68,31 @@ docker run --rm -t -v "$PWD:/data" "$OSRM_IMAGE" \
 ### ─────────────────────────────────────────────
 ### 6. Launch OSRM server on :5001
 ### ─────────────────────────────────────────────
-echo "🚀 Launching OSRM on port 5001…"
+echo "🚀 Launching OSRM on port 5000…"
 docker rm -f osrm-server >/dev/null 2>&1 || true
 docker run -d \
   --name osrm-server \
   --restart unless-stopped \
-  -p 5001:5000 \
   -v "$PWD:/data" \
   "$OSRM_IMAGE" \
   osrm-routed --algorithm mld "/data/$OSRM_BASE"
 
-echo "✅ OSRM server running → http://localhost:5001/route/v1/driving/…"
-
-### ─────────────────────────────────────────────
-### 7. Create VROOM config.yml
-### ─────────────────────────────────────────────
-echo "📝 Writing VROOM config.yml…"
-cat > "$VROOM_DIR/config.yml" <<EOF
-routers:
-  osrm:
-    host: host.docker.internal
-    port: 5001
-    profile: car
-EOF
+echo "✅ OSRM server running → http://localhost:5000/route/v1/driving/…"
+ 
 
 ### ─────────────────────────────────────────────
 ### 8. Launch VROOM server on :5002
 ### ─────────────────────────────────────────────
-echo "🚀 Launching VROOM on port 5002…"
-docker rm -f vroom >/dev/null 2>&1 || true
-docker run -d \
-  --name vroom \
-  --restart unless-stopped \
-  -p 5002:3000 \
-  -v "$VROOM_DIR:/conf" \
-  -e VROOM_ROUTER=osrm \
-  "$VROOM_IMAGE"
+echo "🚀 Launching VROOM on port 5000…"
 
-echo "✅ VROOM running → http://localhost:5002"
+docker run -dt --name vroom \
+    --restart unless-stopped \
+    --net host \  # or set the container name as host in config.yml and use --port 3000:3000 instead, see below
+    -v $PWD/conf:/conf \ # mapped volume for config & log
+    -e VROOM_ROUTER=osrm \ # routing layer: osrm, valhalla or ors
+    ghcr.io/vroom-project/vroom-docker:v1.14.0
+
+echo "✅ VROOM running → http://localhost:5000"
 
 ### ─────────────────────────────────────────────
 ### DONE
