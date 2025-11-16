@@ -46,11 +46,11 @@ docker run --rm -t -v "$PWD:/data" "$OSRM_IMAGE" \
   osrm-customize "/data/$OSRM_BASE"
 
 # 6. Launch the routing server
-echo "🚀 Launching OSRM for Addis Ababa on :5001 …"
+echo "🚀 Launching OSRM for Addis Ababa on :5000 …"
 docker run -d \
   --name osrm-server \
   --restart unless-stopped \
-  -p 5001:5000 \
+  -p 5000:5000 \
   -v "$PWD:/data" \
   "$OSRM_IMAGE" \
   osrm-routed --algorithm mld "/data/$OSRM_BASE"
