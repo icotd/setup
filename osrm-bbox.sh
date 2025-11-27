@@ -7,7 +7,7 @@ OSM_FILENAME="$(basename "$OSM_URL")"            # ethiopia-latest.osm.pbf
 EXTRACT_FILENAME="addis-ababa.osm.pbf"           # extracted file
 BASE="addis-ababa"                               
 OSRM_BASE="${BASE}.osrm"                         # addis-ababa.osrm
-OSRM_IMAGE="osrm/osrm-backend:latest"
+OSRM_IMAGE="osrm/osrm-backend:v6.0.0"
 
 mkdir -p "$OSRM_DIR"
 cd "$OSRM_DIR"
