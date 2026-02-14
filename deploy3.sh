@@ -174,7 +174,7 @@ clone_and_build() {
   # enforce repo ownership (prevents future “dubious ownership” + sqlite write issues)
   chown -R deploy:deploy "$APP_DIR"
 }
-
+ 
 write_app_service() {
   cat > "$SVC_FILE" <<EOF
 #!/sbin/openrc-run
@@ -183,8 +183,8 @@ name="${REPO_NAME}"
 description="${REPO_NAME} (SvelteKit on Bun)"
 
 directory="${APP_DIR}"
-command="/usr/bin/env"
-command_args="PORT=3000 NODE_ENV=production /usr/local/bin/bun ${APP_DIR}/build/index.js"
+command="/usr/local/bin/bun"
+command_args="${APP_DIR}/build/index.js"
 command_user="deploy:deploy"
 
 pidfile="/run/\${RC_SVCNAME}.pid"
@@ -193,28 +193,37 @@ error_log="/var/log/\${RC_SVCNAME}.err"
 
 depend() { need net; }
 
-start() {
+start_pre() {
   checkpath -f -m 0644 -o deploy:deploy "\$output_log" "\$error_log"
 
+  # Export env here (supervise-daemon inherits it)
+  export NODE_ENV="production"
+  export PORT="3000"
+  export HOST="127.0.0.1"
+}
+
+start() {
   supervise-daemon "\${RC_SVCNAME}" \\
     --user "\${command_user}" \\
     --chdir "\${directory}" \\
-    --stdout "\$output_log" \\
-    --stderr "\$error_log" \\
-    --pidfile "\$pidfile" \\
+    --stdout "\${output_log}" \\
+    --stderr "\${error_log}" \\
+    --pidfile "\${pidfile}" \\
     -- \\
-    \${command} \${command_args}
+    "\${command}" \${command_args}
 }
 
 stop() {
-  supervise-daemon "\${RC_SVCNAME}" --stop --pidfile "\$pidfile"
+  supervise-daemon "\${RC_SVCNAME}" --stop --pidfile "\${pidfile}"
 }
 EOF
 
   chmod +x "$SVC_FILE"
   rc-update add "$REPO_NAME" default >/dev/null 2>&1 || true
   rc-service "$REPO_NAME" restart || true
+  rc-service "$REPO_NAME" status || true
 }
+ 
 
 write_caddyfile() {
   mkdir -p /etc/caddy
