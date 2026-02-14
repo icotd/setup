@@ -184,10 +184,15 @@ error_log="/var/log/\${RC_SVCNAME}.err"
 depend() { need net; }
 
 start_pre() {
-  checkpath -f -m 0644 -o deploy:deploy "\$output_log" "\$error_log"
-  export NODE_ENV="production"
-  export PORT="3000"
-  export HOST="0.0.0.0"
+  checkpath -f -m 0644 -o deploy:deploy "$output_log" "$error_log"
+
+  ENV_FILE="${directory}/.env"
+  [ -f "$ENV_FILE" ] || { eerror "Missing $ENV_FILE"; return 1; }
+
+  # Make variables available to the bun process
+  set -a
+  . "$ENV_FILE"
+  set +a
 }
 
 start() {
