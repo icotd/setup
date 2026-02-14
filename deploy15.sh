@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+umask 027
+
+: "${GITHUB_USER:?Missing GITHUB_USER}"
+: "${REPO_NAME:?Missing REPO_NAME}"
+: "${DOMAIN:?Missing DOMAIN}"
+: "${ADMIN_PUBKEY:?Missing ADMIN_PUBKEY}"
+
+APP_DIR="/var/www/${REPO_NAME}"
+SVC_FILE="/etc/init.d/${REPO_NAME}"
+CADDYFILE="/etc/caddy/Caddyfile"
+
+need_root() {
+  [ "$(id -u)" -eq 0 ] || { echo "Run as root."; exit 1; }
+}
+
+retry() {
+  local n=0 max=5 delay=2
+  until "$@"; do
+    n=$((n+1))
+    [ "$n" -ge "$max" ] && return 1
+    sleep "$delay"
+    delay=$((delay*2))
+  done
+}
+
+enable_repos() {
+  [ -f /etc/apk/repositories ] && \
+  sed -i -E 's|^#(https?://.*/v[0-9]+\.[0-9]+/community)$|\1|' /etc/apk/repositories || true
+}
+
+install_packages() {
+  retry apk update
+  retry apk add --no-cache \
+    bash openssh sudo curl git ca-certificates \
+    caddy libstdc++ libgcc perl
+  update-ca-certificates || true
+}
+
+setup_services() {
+  rc-update add sshd default >/dev/null 2>&1 || true
+  rc-service sshd start >/dev/null 2>&1 || true
+  rc-update add caddy default >/dev/null 2>&1 || true
+  rc-service caddy start >/dev/null 2>&1 || true
+}
+
+create_deploy_user() {
+  id deploy >/dev/null 2>&1 || adduser -D -s /bin/ash deploy
+  addgroup deploy wheel >/dev/null 2>&1 || true
+}
+
+setup_admin_ssh_key() {
+  install -d -m 700 -o deploy -g deploy /home/deploy/.ssh
+  printf "%s\n" "$ADMIN_PUBKEY" > /home/deploy/.ssh/authorized_keys
+  chown deploy:deploy /home/deploy/.ssh/authorized_keys
+  chmod 600 /home/deploy/.ssh/authorized_keys
+}
+
+install_bun() {
+  su - deploy -c '
+    if [ ! -x "$HOME/.bun/bin/bun" ]; then
+      curl -fsSL https://bun.sh/install | bash
+    fi
+  '
+  ln -sf /home/deploy/.bun/bin/bun /usr/local/bin/bun
+}
+
+clone_and_build() {
+  su - deploy -c "
+    set -Eeuo pipefail
+    export PATH=\$HOME/.bun/bin:\$PATH
+
+    if [ ! -d '$APP_DIR/.git' ]; then
+      git clone 'git@github.com:${GITHUB_USER}/${REPO_NAME}.git' '$APP_DIR'
+    fi
+
+    cd '$APP_DIR'
+    git fetch --all --prune
+    git pull --ff-only
+
+    bun install --frozen-lockfile
+    bun run build
+  "
+}
+
+write_service() {
+  cat > "$SVC_FILE" <<EOF
+#!/sbin/openrc-run
+
+name="${REPO_NAME}"
+description="${REPO_NAME} (SvelteKit on Bun)"
+
+directory="${APP_DIR}"
+command="/usr/local/bin/bun"
+command_args="${APP_DIR}/build/index.js"
+command_user="deploy:deploy"
+
+pidfile="/run/\${RC_SVCNAME}.pid"
+output_log="/var/log/\${RC_SVCNAME}.log"
+error_log="/var/log/\${RC_SVCNAME}.err"
+
+depend() { need net; }
+
+start() {
+  checkpath -f -m 0644 -o deploy:deploy "\$output_log" "\$error_log"
+
+  supervise-daemon "\${RC_SVCNAME}" \\
+    --user "\${command_user}" \\
+    --chdir "\${directory}" \\
+    --stdout "\${output_log}" \\
+    --stderr "\${error_log}" \\
+    --pidfile "\${pidfile}" \\
+    -- \\
+    \${command} \${command_args}
+}
+
+stop() {
+  supervise-daemon "\${RC_SVCNAME}" --stop --pidfile "\${pidfile}"
+}
+EOF
+
+  chmod +x "$SVC_FILE"
+  rc-update add "$REPO_NAME" default >/dev/null 2>&1 || true
+  rc-service "$REPO_NAME" restart || true
+}
+
+write_caddyfile() {
+  cat > "$CADDYFILE" <<EOF
+${DOMAIN} {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:3000
+}
+
+www.${DOMAIN} {
+  redir https://${DOMAIN}{uri} permanent
+}
+EOF
+
+  caddy fmt --overwrite "$CADDYFILE" >/dev/null 2>&1 || true
+  rc-service caddy reload >/dev/null 2>&1 || true
+}
+
+main() {
+  need_root
+  enable_repos
+  install_packages
+  setup_services
+  create_deploy_user
+  setup_admin_ssh_key
+  install_bun
+  clone_and_build
+  write_service
+  write_caddyfile
+}
+
+main "$@"
