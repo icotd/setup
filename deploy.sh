@@ -150,6 +150,7 @@ EOF
 }
 
 fix_permissions() {
+  mkdir -p "${APP_DIR}/data"
   touch "${APP_DIR}/data/data.db"
   chown -R deploy:deploy "${APP_DIR}/data"
   chmod 775 "${APP_DIR}/data"
@@ -157,7 +158,6 @@ fix_permissions() {
 }
 
 write_openrc_service() {
-  # Uses supervise-daemon for reliable backgrounding + pid management.
   cat > "$SVC_FILE" <<EOF
 #!/sbin/openrc-run
 
@@ -165,43 +165,30 @@ name="${REPO_NAME}"
 description="${REPO_NAME} (SvelteKit on Bun)"
 
 directory="${APP_DIR}"
-command="/usr/local/bin/bun"
+command="/bin/sh"
 command_user="deploy:deploy"
+pidfile="/run/\${RC_SVCNAME}.pid"
 
-# Prefer direct node build output if present; otherwise fall back to package.json start script.
-start_pre() {
-  checkpath -d -m 0755 -o deploy:deploy /run/${REPO_NAME}
-  if [ -f "${ENV_FILE}" ]; then
-    set -a
-    . "${ENV_FILE}"
-    set +a
-  fi
-}
+output_log="/var/log/\${RC_SVCNAME}.log"
+error_log="/var/log/\${RC_SVCNAME}.err"
+
+depend() { need net; }
 
 start() {
-  cd "\${directory}" || return 1
+  checkpath -f -m 0644 -o deploy:deploy "\$output_log" "\$error_log"
 
-  if [ -f "build/index.js" ]; then
-    supervise-daemon "\${RC_SVCNAME}" \\
-      --user "\${command_user}" \\
-      --chdir "\${directory}" \\
-      --stdout /var/log/\${RC_SVCNAME}.log \\
-      --stderr /var/log/\${RC_SVCNAME}.err \\
-      --pidfile /run/\${RC_SVCNAME}.pid \\
-      -- \${command} build/index.js
-  else
-    supervise-daemon "\${RC_SVCNAME}" \\
-      --user "\${command_user}" \\
-      --chdir "\${directory}" \\
-      --stdout /var/log/\${RC_SVCNAME}.log \\
-      --stderr /var/log/\${RC_SVCNAME}.err \\
-      --pidfile /run/\${RC_SVCNAME}.pid \\
-      -- \${command} run start
-  fi
+  supervise-daemon "\$RC_SVCNAME" \\
+    --user "\$command_user" \\
+    --chdir "\$directory" \\
+    --stdout "\$output_log" \\
+    --stderr "\$error_log" \\
+    --pidfile "\$pidfile" \\
+    -- \\
+    /bin/sh -lc 'set -a; . "${ENV_FILE}"; set +a; exec /usr/local/bin/bun build/index.js'
 }
 
 stop() {
-  supervise-daemon "\${RC_SVCNAME}" --stop --pidfile /run/\${RC_SVCNAME}.pid
+  supervise-daemon "\$RC_SVCNAME" --stop --pidfile "\$pidfile"
 }
 EOF
 
@@ -210,6 +197,16 @@ EOF
   rc-service "$REPO_NAME" restart
   rc-service "$REPO_NAME" status || true
 }
+
+# Optional: also ensure ENV_FILE is root-readable (service runs as root; fine at 0600 root:root)
+# But the *deploy* user will read it inside the shell, so allow read:
+# safest reasonable:
+#   chown root:deploy /etc/$REPO_NAME.env
+#   chmod 0640 /etc/$REPO_NAME.env
+
+# Add this right after write_env_file() in your one-go script:
+chmod 0640 "$ENV_FILE"
+chown root:deploy "$ENV_FILE"
 
 write_caddyfile() {
   cat > "$CADDYFILE" <<EOF
