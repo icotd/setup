@@ -69,7 +69,6 @@ generate_github_key() {
       ssh-keygen -t ed25519 -C "vps-deploy" -N "" -f "$HOME/.ssh/id_ed25519"
     fi
 
-    # preload github host to avoid interactive prompt
     ssh-keyscan github.com >> "$HOME/.ssh/known_hosts" 2>/dev/null
     chmod 600 "$HOME/.ssh/known_hosts"
   '
@@ -82,7 +81,9 @@ generate_github_key() {
   echo "Add this key to:"
   echo "Repo -> Settings -> Deploy keys -> Add deploy key"
   echo ""
-  read -p "Press ENTER after adding the key..."
+
+  printf "Press ENTER after adding the key..."
+  read -r _ < /dev/tty
 }
 
 prepare_app_dir() {
