@@ -20,6 +20,21 @@ need_root() {
   fi
 }
 
+have_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+retry() {
+  local n=0 max=5 delay=2
+  until "$@"; do
+    n=$((n+1))
+    if [ "$n" -ge "$max" ]; then
+      echo "Command failed after ${max} attempts: $*" >&2
+      return 1
+    fi
+    sleep "$delay"
+    delay=$((delay*2))
+  done
+}
+
 enable_repos() {
   # Ensure community repo is enabled (often needed for extra packages)
   if [ -f /etc/apk/repositories ]; then
@@ -28,8 +43,8 @@ enable_repos() {
 }
 
 install_packages() {
-  apk update
-  apk add --no-cache \
+  retry apk update
+  retry apk add --no-cache \
     bash \
     openssh \
     sudo \
@@ -101,7 +116,7 @@ generate_github_deploy_key() {
   echo ""
   echo "Add this key in GitHub:"
   echo "  Repo -> Settings -> Deploy keys -> Add deploy key"
-  echo "  (Enable 'Allow write access' if you want pushes from server.)"
+  echo "  (Enable 'Allow write access' only if needed.)"
   echo ""
   printf "Press ENTER after you've added the key... "
   read -r _ || true
@@ -147,7 +162,7 @@ PORT=3000
 DATABASE_URL=${APP_DIR}/data/data.db
 EOF
 
-  # allow deploy to read (service runs bun as deploy and sources this file)
+  # allow deploy to read (service runs as deploy and sources this file)
   chown root:deploy "$ENV_FILE"
   chmod 0640 "$ENV_FILE"
 }
@@ -168,7 +183,7 @@ name="${REPO_NAME}"
 description="${REPO_NAME} (SvelteKit on Bun)"
 
 directory="${APP_DIR}"
-command="/bin/sh"
+command="/sbin/su"
 command_user="deploy:deploy"
 pidfile="/run/\${RC_SVCNAME}.pid"
 
@@ -187,7 +202,7 @@ start() {
     --stderr "\$error_log" \\
     --pidfile "\$pidfile" \\
     -- \\
-    /bin/sh -lc 'set -a; . /etc/${REPO_NAME}.env; set +a; exec /usr/local/bin/bun build/index.js'
+    /bin/sh -lc 'set -a; . /etc/${REPO_NAME}.env; set +a; exec /usr/local/bin/bun ${APP_DIR}/build/index.js'
 }
 
 stop() {
@@ -197,22 +212,14 @@ EOF
 
   chmod +x "$SVC_FILE"
   rc-update add "$REPO_NAME" default >/dev/null 2>&1 || true
-  rc-service "$REPO_NAME" restart
+  rc-service "$REPO_NAME" restart || true
   rc-service "$REPO_NAME" status || true
 }
-# Optional: also ensure ENV_FILE is root-readable (service runs as root; fine at 0600 root:root)
-# But the *deploy* user will read it inside the shell, so allow read:
-# safest reasonable:
-#   chown root:deploy /etc/$REPO_NAME.env
-#   chmod 0640 /etc/$REPO_NAME.env
-
-# Add this right after write_env_file() in your one-go script:
-chmod 0640 "$ENV_FILE"
-chown root:deploy "$ENV_FILE"
 
 write_caddyfile() {
   cat > "$CADDYFILE" <<EOF
 ${DOMAIN} {
+  encode zstd gzip
   reverse_proxy 127.0.0.1:3000
 }
 
@@ -244,6 +251,9 @@ final_checks() {
   echo "Logs:"
   echo "  tail -n 200 /var/log/${REPO_NAME}.log"
   echo "  tail -n 200 /var/log/${REPO_NAME}.err"
+  echo ""
+  echo "Service control:"
+  echo "  rc-service ${REPO_NAME} restart|stop|start|status"
 }
 
 main() {
