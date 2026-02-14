@@ -218,9 +218,25 @@ EOF
   rc-service "$REPO_NAME" restart >/dev/null 2>&1 || true
 }
 
+ensure_caddy_can_bind_low_ports() {
+  local bin
+  bin="$(command -v caddy || true)"
+  [ -n "$bin" ] || return 0
+  setcap 'cap_net_bind_service=+ep' "$bin" >/dev/null 2>&1 || true
+}
+
 write_caddyfile() {
+  mkdir -p /etc/caddy
+
   cat > "$CADDYFILE" <<EOF
+{
+  # keep logs in journald/openrc by default (no file logs)
+  # uncomment if debugging:
+  # debug
+}
+
 ${DOMAIN} {
+  encode zstd gzip
   reverse_proxy 127.0.0.1:3000
 }
 
@@ -230,7 +246,11 @@ www.${DOMAIN} {
 EOF
 
   caddy fmt --overwrite "$CADDYFILE" >/dev/null 2>&1 || true
-  rc-service caddy reload >/dev/null 2>&1 || true
+  caddy validate --config "$CADDYFILE" >/dev/null
+
+  ensure_caddy_can_bind_low_ports
+  rc-update add caddy default >/dev/null 2>&1 || true
+  rc-service caddy restart >/dev/null 2>&1 || true
 }
 
 final_checks() {
