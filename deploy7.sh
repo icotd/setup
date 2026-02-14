@@ -150,7 +150,6 @@ EOF
 }
 
 fix_permissions() {
-  mkdir -p "${APP_DIR}/data"
   touch "${APP_DIR}/data/data.db"
   chown -R deploy:deploy "${APP_DIR}/data"
   chmod 775 "${APP_DIR}/data"
