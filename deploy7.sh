@@ -65,21 +65,19 @@ install_packages() {
     bash openssh curl git ca-certificates \
     libstdc++ libgcc perl
 
-  # for setcap on caddy
   retry apk add --no-cache libcap
-
-  # optional
   apk add --no-cache sudo >/dev/null 2>&1 || true
-
-  # caddy + openrc
   retry apk add --no-cache caddy caddy-openrc
 
-  update-ca-certificates || true
+  update-ca-certificates >/dev/null 2>&1 || true
 }
 
 setup_services() {
   rc-update add sshd default >/dev/null 2>&1 || true
   rc-service sshd restart >/dev/null 2>&1 || true
+
+  rc-update add caddy default >/dev/null 2>&1 || true
+  rc-service caddy restart >/dev/null 2>&1 || true
 }
 
 create_deploy_user() {
@@ -121,8 +119,7 @@ generate_github_key() {
   su - deploy -c 'cat "$HOME/.ssh/id_ed25519.pub"'
   echo "======================================================="
   echo ""
-  echo "Add this key to:"
-  echo "Repo -> Settings -> Deploy keys -> Add deploy key"
+  echo "Add this key to: Repo -> Settings -> Deploy keys -> Add deploy key"
   echo ""
   printf "Press ENTER after adding the key..."
   read -r _ < /dev/tty
@@ -151,9 +148,21 @@ clone_and_build() {
 
     bun install --frozen-lockfile
     bun run build
+
+    # patch build/handler.js only if needed
+    if [ -f build/handler.js ]; then
+      if grep -q 'server\\.websocket()' build/handler.js; then
+        perl -i -pe 's/const websocket = server\\.websocket\\(\\);/const websocket = server.websocket?.();/g' build/handler.js
+      fi
+    fi
   "
 
   chown -R deploy:deploy "$APP_DIR"
+
+  # do NOT create data; only fix perms if it exists
+  if [ -d "$APP_DIR/data" ]; then
+    chown -R deploy:deploy "$APP_DIR/data"
+  fi
 }
 
 write_app_service() {
@@ -182,21 +191,25 @@ start_pre() {
 }
 
 start() {
+  ebegin "Starting \${RC_SVCNAME}"
   supervise-daemon "\${RC_SVCNAME}" \\
-    --start \\
-    --user "\${command_user}" \\
-    --chdir "\${directory}" \\
-    --stdout "\${output_log}" \\
-    --stderr "\${error_log}" \\
-    --pidfile "\${pidfile}" \\
-    --respawn-delay 2 \\
-    --respawn-max 0 \\
+    -S \\
+    -u "\${command_user}" \\
+    -d "\${directory}" \\
+    -1 "\${output_log}" \\
+    -2 "\${error_log}" \\
+    -p "\${pidfile}" \\
+    -D 2 \\
+    -m 0 \\
     -- \\
     "\${command}" \${command_args}
+  eend \$?
 }
 
 stop() {
-  supervise-daemon "\${RC_SVCNAME}" --stop --pidfile "\${pidfile}"
+  ebegin "Stopping \${RC_SVCNAME}"
+  supervise-daemon "\${RC_SVCNAME}" -K -p "\${pidfile}"
+  eend \$?
 }
 EOF
 
@@ -216,6 +229,12 @@ write_caddyfile() {
   mkdir -p /etc/caddy
 
   cat > "$CADDYFILE" <<EOF
+{
+  # keep logs in journald/openrc by default (no file logs)
+  # uncomment if debugging:
+  # debug
+}
+
 ${DOMAIN} {
   encode zstd gzip
   reverse_proxy 127.0.0.1:3000
@@ -230,9 +249,30 @@ EOF
   caddy validate --config "$CADDYFILE" >/dev/null
 
   ensure_caddy_can_bind_low_ports
-
   rc-update add caddy default >/dev/null 2>&1 || true
   rc-service caddy restart >/dev/null 2>&1 || true
+}
+
+final_checks() {
+  # fail fast if app not reachable locally
+  if ! curl -fsS -I http://127.0.0.1:3000 >/dev/null 2>&1; then
+    echo "APP DOWN: cannot reach http://127.0.0.1:3000" >&2
+    echo "---- /var/log/${REPO_NAME}.err ----" >&2
+    tail -n 200 "/var/log/${REPO_NAME}.err" 2>/dev/null || true
+    exit 1
+  fi
+
+  # fail fast if caddy not reachable locally
+  if ! curl -fsS -I http://127.0.0.1 >/dev/null 2>&1; then
+    echo "CADDY DOWN: cannot reach http://127.0.0.1" >&2
+    rc-service caddy status || true
+    exit 1
+  fi
+
+  echo "OK"
+  echo "  app  : http://127.0.0.1:3000"
+  echo "  proxy: http://127.0.0.1"
+  echo "  live : https://${DOMAIN}"
 }
 
 main() {
@@ -247,6 +287,7 @@ main() {
   clone_and_build
   write_app_service
   write_caddyfile
+  final_checks
 }
 
 main "$@"
