@@ -68,7 +68,6 @@ install_bun() {
 }
 
 prepare_app_dir() {
-  mkdir -p /var/www
   mkdir -p "$APP_DIR"
   chown -R deploy:deploy /var/www
 }
@@ -102,8 +101,8 @@ name="${REPO_NAME}"
 description="${REPO_NAME} (SvelteKit on Bun)"
 
 directory="${APP_DIR}"
-command="/usr/local/bin/bun"
-command_args="${APP_DIR}/build/index.js"
+command="/usr/bin/env"
+command_args="PORT=3000 NODE_ENV=production /usr/local/bin/bun ${APP_DIR}/build/index.js"
 command_user="deploy:deploy"
 
 pidfile="/run/\${RC_SVCNAME}.pid"
