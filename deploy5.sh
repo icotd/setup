@@ -65,10 +65,13 @@ install_packages() {
     bash openssh curl git ca-certificates \
     libstdc++ libgcc perl
 
+  # For setcap on caddy (bind :80/:443 as non-root)
+  retry apk add --no-cache libcap
+
   # optional
   apk add --no-cache sudo >/dev/null 2>&1 || true
 
-  # caddy + openrc init scripts
+  # caddy + openrc
   retry apk add --no-cache caddy caddy-openrc
 
   update-ca-certificates || true
@@ -154,9 +157,6 @@ clone_and_build() {
   "
 
   chown -R deploy:deploy "$APP_DIR"
-
-  # If your app uses sqlite at ./data/data.db, ensure the directory exists (no DB file creation)
-  [ -d "$APP_DIR/data" ] || { mkdir -p "$APP_DIR/data"; chown -R deploy:deploy "$APP_DIR/data"; }
 }
 
 write_app_service() {
@@ -181,30 +181,46 @@ start_pre() {
   checkpath -f -m 0644 -o deploy:deploy "\$output_log" "\$error_log"
   export NODE_ENV="production"
   export PORT="3000"
-  # bind all interfaces so reverse_proxy and local curl both work reliably
-  export HOST="0.0.0.0"
+  export HOST="127.0.0.1"
 }
 
 start() {
+  ebegin "Starting \${RC_SVCNAME}"
   supervise-daemon "\${RC_SVCNAME}" \\
+    --start \\
     --user "\${command_user}" \\
     --chdir "\${directory}" \\
     --stdout "\${output_log}" \\
     --stderr "\${error_log}" \\
     --pidfile "\${pidfile}" \\
-    --respawn --respawn-delay 2 --respawn-max 0 \\
+    --respawn-delay 2 \\
+    --respawn-max 0 \\
     -- \\
     "\${command}" \${command_args}
+  eend \$?
 }
 
 stop() {
+  ebegin "Stopping \${RC_SVCNAME}"
   supervise-daemon "\${RC_SVCNAME}" --stop --pidfile "\${pidfile}"
+  eend \$?
 }
 EOF
 
   chmod +x "$SVC_FILE"
   rc-update add "$REPO_NAME" default >/dev/null 2>&1 || true
   rc-service "$REPO_NAME" restart || true
+}
+
+ensure_caddy_can_bind_low_ports() {
+  # On Alpine, caddy often runs as user "caddy". It needs cap_net_bind_service to bind :80/:443.
+  # Set capability on the actual caddy binary if possible.
+  local bin
+  bin="$(command -v caddy || true)"
+  [ -n "$bin" ] || return 0
+
+  # Try setcap; ignore if filesystem doesn't support it
+  setcap 'cap_net_bind_service=+ep' "$bin" >/dev/null 2>&1 || true
 }
 
 write_caddyfile() {
@@ -223,6 +239,8 @@ EOF
 
   caddy fmt --overwrite "$CADDYFILE" >/dev/null 2>&1 || true
   caddy validate --config "$CADDYFILE" >/dev/null
+
+  ensure_caddy_can_bind_low_ports
   rc-service caddy restart >/dev/null 2>&1 || true
 }
 
@@ -231,8 +249,8 @@ final_checks() {
   echo "=== APP STATUS ==="
   rc-service "$REPO_NAME" status || true
   echo ""
-  echo "=== APP LOG (err) ==="
-  tail -n 120 "/var/log/${REPO_NAME}.err" 2>/dev/null || true
+  echo "=== APP ERR LOG ==="
+  tail -n 200 "/var/log/${REPO_NAME}.err" 2>/dev/null || true
   echo ""
   echo "=== LISTENERS (3000/80/443) ==="
   netstat -tulpn 2>/dev/null | grep -E '(:3000|:80|:443)\b' || true
@@ -242,7 +260,7 @@ final_checks() {
   curl -sS -I http://127.0.0.1 || true
   echo ""
   echo "Open: https://${DOMAIN}"
-  echo "If domain fails but local http://127.0.0.1 works, it's DNS/firewall (ports 80/443)."
+  echo "If local 127.0.0.1 works but domain doesn't, it's DNS/firewall (80/443)."
 }
 
 main() {
