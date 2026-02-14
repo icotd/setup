@@ -146,22 +146,11 @@ EOF
 }
 
 write_openrc_service() {
-  local entry=""
+  : "${ENTRY_FILE:?Set ENTRY_FILE to your built server entry (e.g. /var/www/$REPO_NAME/build/index.js)}"
 
-  # Detect common SvelteKit outputs (pick the first that exists)
-  for f in \
-    "${APP_DIR}/build/index.js" \
-    "${APP_DIR}/build/handler.js" \
-    "${APP_DIR}/build/server/index.js"
-  do
-    if [ -f "$f" ]; then
-      entry="$f"
-      break
-    fi
-  done
-
-  if [ -z "$entry" ]; then
-    echo "ERROR: Could not find server entry in ${APP_DIR}/build" >&2
+  if [ ! -f "$ENTRY_FILE" ]; then
+    echo "ERROR: ENTRY_FILE does not exist: $ENTRY_FILE" >&2
+    echo "Build dir contents:" >&2
     ls -la "${APP_DIR}/build" >&2 || true
     return 1
   fi
@@ -173,7 +162,7 @@ name="${REPO_NAME}"
 description="SvelteKit on Bun (${REPO_NAME})"
 
 command="/home/deploy/.bun/bin/bun"
-command_args="${entry}"
+command_args="${ENTRY_FILE}"
 command_user="deploy"
 
 command_background="yes"
@@ -199,13 +188,10 @@ EOF
   chmod +x "$SVC_FILE"
   rc-update add "$REPO_NAME" default >/dev/null 2>&1 || true
 
-  # Restart/start and show useful debug if it fails
-  if ! rc-service "$REPO_NAME" restart; then
-    rc-service "$REPO_NAME" start || true
-    echo "---- ${REPO_NAME} error log ----" >&2
-    tail -n 200 "/var/log/${REPO_NAME}.err" >&2 || true
-    return 1
-  fi
+  echo "Service written: $SVC_FILE"
+  echo "Will run as deploy: /home/deploy/.bun/bin/bun $ENTRY_FILE"
+
+  rc-service "$REPO_NAME" restart
 }
 
 write_caddyfile() {
