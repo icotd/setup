@@ -1,5 +1,7 @@
-#!/bin/bash
-set -eu
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+umask 027
 
 : "${GITHUB_USER:?Missing GITHUB_USER}"
 : "${REPO_NAME:?Missing REPO_NAME}"
@@ -12,33 +14,41 @@ SVC_FILE="/etc/init.d/${REPO_NAME}"
 CADDYFILE="/etc/caddy/Caddyfile"
 
 need_root() {
-  [ "$(id -u)" -eq 0 ] || { echo "Run as root." >&2; exit 1; }
+  if [ "$(id -u)" -ne 0 ]; then
+    echo "Run as root." >&2
+    exit 1
+  fi
 }
 
 enable_repos() {
-  # Ensure community is enabled (needed for sudo, etc.)
-  if grep -qE '^[#]*https?://.*/v[0-9]+\.[0-9]+/community' /etc/apk/repositories; then
-    sed -i 's|^#\(https\?://.*/community\)$|\1|' /etc/apk/repositories
+  # Ensure community repo is enabled (often needed for extra packages)
+  if [ -f /etc/apk/repositories ]; then
+    sed -i -E 's|^#(https?://.*/v[0-9]+\.[0-9]+/community)$|\1|' /etc/apk/repositories || true
   fi
 }
 
 install_packages() {
   apk update
   apk add --no-cache \
-    bash openssh sudo curl git ca-certificates nano \
+    bash \
+    openssh \
+    sudo \
+    curl \
+    git \
+    ca-certificates \
     caddy \
-    libstdc++ libgcc \
-    perl \
-    build-base python3 make g++
+    libstdc++ \
+    libgcc \
+    perl
   update-ca-certificates || true
 }
 
 setup_services() {
-  rc-update add sshd default || true
-  rc-service sshd start || true
+  rc-update add sshd default >/dev/null 2>&1 || true
+  rc-service sshd start >/dev/null 2>&1 || true
 
-  rc-update add caddy default || true
-  rc-service caddy start || true
+  rc-update add caddy default >/dev/null 2>&1 || true
+  rc-service caddy start >/dev/null 2>&1 || true
 }
 
 create_deploy_user() {
@@ -46,60 +56,47 @@ create_deploy_user() {
     adduser -D -s /bin/ash deploy
   fi
 
-  addgroup deploy wheel 2>/dev/null || true
+  addgroup deploy wheel >/dev/null 2>&1 || true
+
   mkdir -p /etc/sudoers.d
-  echo '%wheel ALL=(ALL) ALL' > /etc/sudoers.d/wheel
+  printf "%s\n" '%wheel ALL=(ALL) ALL' > /etc/sudoers.d/wheel
   chmod 440 /etc/sudoers.d/wheel
 }
 
 setup_admin_ssh_key() {
-  mkdir -p /home/deploy/.ssh
-  chown -R deploy:deploy /home/deploy/.ssh
-  chmod 700 /home/deploy/.ssh
-
-  # Install ADMIN pubkey as authorized_keys
+  install -d -m 700 -o deploy -g deploy /home/deploy/.ssh
   printf "%s\n" "$ADMIN_PUBKEY" > /home/deploy/.ssh/authorized_keys
   chown deploy:deploy /home/deploy/.ssh/authorized_keys
   chmod 600 /home/deploy/.ssh/authorized_keys
 }
 
 install_bun_for_deploy() {
-  # Install bun under deploy user if missing
   su - deploy -c '
-    set -eu
-
+    set -Eeuo pipefail
     if [ ! -x "$HOME/.bun/bin/bun" ]; then
       curl -fsSL https://bun.sh/install | bash
     fi
   '
 
-  # Ensure runtime libs exist (required on Alpine)
-  apk add --no-cache libstdc++ libgcc >/dev/null 2>&1 || true
+  mkdir -p /usr/local/bin
+  ln -sf /home/deploy/.bun/bin/bun /usr/local/bin/bun
 
-# Create global symlink so bun works for root and services
-mkdir -p /usr/local/bin
-ln -sf /home/deploy/.bun/bin/bun /usr/local/bin/bun >/dev/null 2>&1
-
-# Verify (fail if missing/broken)
-command -v bun >/dev/null 2>&1 || { echo "bun not found after install"; exit 1; }
-bun --version >/dev/null 2>&1 || { echo "bun failed to run (missing libs like libstdc++?)"; exit 1; }
+  command -v bun >/dev/null 2>&1 || { echo "bun not found after install" >&2; exit 1; }
+  bun --version >/dev/null 2>&1 || { echo "bun failed to run (missing libs?)" >&2; exit 1; }
 }
-
-
 
 generate_github_deploy_key() {
   su - deploy -c '
-    set -eu
-    mkdir -p ~/.ssh
-    chmod 700 ~/.ssh
-    if [ ! -f ~/.ssh/id_ed25519 ]; then
-      ssh-keygen -t ed25519 -C "vps-deploy" -N "" -f ~/.ssh/id_ed25519
+    set -Eeuo pipefail
+    install -d -m 700 "$HOME/.ssh"
+    if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
+      ssh-keygen -t ed25519 -C "vps-deploy" -N "" -f "$HOME/.ssh/id_ed25519"
     fi
   '
 
   echo ""
   echo "================== GITHUB DEPLOY KEY =================="
-  su - deploy -c 'cat ~/.ssh/id_ed25519.pub'
+  su - deploy -c 'cat "$HOME/.ssh/id_ed25519.pub"'
   echo "======================================================="
   echo ""
   echo "Add this key in GitHub:"
@@ -107,7 +104,7 @@ generate_github_deploy_key() {
   echo "  (Enable 'Allow write access' if you want pushes from server.)"
   echo ""
   printf "Press ENTER after you've added the key... "
-  read _ || true
+  read -r _ || true
 }
 
 clone_and_build() {
@@ -115,15 +112,22 @@ clone_and_build() {
   chown -R deploy:deploy /var/www
 
   su - deploy -c "
-    set -eu
+    set -Eeuo pipefail
     export PATH=\$HOME/.bun/bin:\$PATH
-    mkdir -p '$APP_DIR'
+
     if [ ! -d '$APP_DIR/.git' ]; then
       git clone 'git@github.com:${GITHUB_USER}/${REPO_NAME}.git' '$APP_DIR'
     fi
+
     cd '$APP_DIR'
     git fetch --all --prune
-    git checkout -f
+
+    default_branch=\$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||' || true)
+    if [ -n \"\$default_branch\" ]; then
+      git checkout -f \"\$default_branch\"
+    else
+      git checkout -f
+    fi
     git pull --ff-only
 
     if [ -f .env.example ] && [ ! -f .env ]; then
@@ -132,7 +136,6 @@ clone_and_build() {
 
     bun install --frozen-lockfile
     bun run build
-    ls -la build || true
   "
 }
 
@@ -141,49 +144,72 @@ write_env_file() {
 NODE_ENV=production
 HOST=127.0.0.1
 PORT=3000
-DATABASE_URL=/var/www/brighton-pms/data/data.db
+DATABASE_URL=${APP_DIR}/data/data.db
 EOF
   chmod 600 "$ENV_FILE"
 }
 
-write_openrc_service() {
-  [ -d "$APP_DIR" ] || { echo "APP_DIR not found: $APP_DIR" >&2; return 1; }
-  [ -f "$APP_DIR/build/index.js" ] || { echo "Missing: $APP_DIR/build/index.js" >&2; ls -la "$APP_DIR/build" >&2 || true; return 1; }
-  [ -x /home/deploy/.bun/bin/bun ] || { echo "Missing bun: /home/deploy/.bun/bin/bun" >&2; return 1; }
+fix_permissions() {
+  mkdir -p "${APP_DIR}/data"
+  touch "${APP_DIR}/data/data.db"
+  chown -R deploy:deploy "${APP_DIR}/data"
+  chmod 775 "${APP_DIR}/data"
+  chmod 664 "${APP_DIR}/data/data.db"
+}
 
+write_openrc_service() {
+  # Uses supervise-daemon for reliable backgrounding + pid management.
   cat > "$SVC_FILE" <<EOF
 #!/sbin/openrc-run
 
 name="${REPO_NAME}"
-description="SvelteKit on Bun (${REPO_NAME})"
+description="${REPO_NAME} (SvelteKit on Bun)"
 
 directory="${APP_DIR}"
-
-command="/home/deploy/.bun/bin/bun"
-command_args="build/index.js"
+command="/usr/local/bin/bun"
 command_user="deploy:deploy"
 
-command_background="yes"
-pidfile="/run/\${RC_SVCNAME}.pid"
-
-output_log="/var/log/\${RC_SVCNAME}.log"
-error_log="/var/log/\${RC_SVCNAME}.err"
-
-depend() {
-  need net
-}
-
+# Prefer direct node build output if present; otherwise fall back to package.json start script.
 start_pre() {
-  checkpath --file --owner deploy:deploy --mode 0644 "\$output_log" "\$error_log"
+  checkpath -d -m 0755 -o deploy:deploy /run/${REPO_NAME}
   if [ -f "${ENV_FILE}" ]; then
     set -a
     . "${ENV_FILE}"
     set +a
   fi
 }
+
+start() {
+  cd "\${directory}" || return 1
+
+  if [ -f "build/index.js" ]; then
+    supervise-daemon "\${RC_SVCNAME}" \\
+      --user "\${command_user}" \\
+      --chdir "\${directory}" \\
+      --stdout /var/log/\${RC_SVCNAME}.log \\
+      --stderr /var/log/\${RC_SVCNAME}.err \\
+      --pidfile /run/\${RC_SVCNAME}.pid \\
+      -- \${command} build/index.js
+  else
+    supervise-daemon "\${RC_SVCNAME}" \\
+      --user "\${command_user}" \\
+      --chdir "\${directory}" \\
+      --stdout /var/log/\${RC_SVCNAME}.log \\
+      --stderr /var/log/\${RC_SVCNAME}.err \\
+      --pidfile /run/\${RC_SVCNAME}.pid \\
+      -- \${command} run start
+  fi
+}
+
+stop() {
+  supervise-daemon "\${RC_SVCNAME}" --stop --pidfile /run/\${RC_SVCNAME}.pid
+}
 EOF
 
   chmod +x "$SVC_FILE"
+  rc-update add "$REPO_NAME" default >/dev/null 2>&1 || true
+  rc-service "$REPO_NAME" restart
+  rc-service "$REPO_NAME" status || true
 }
 
 write_caddyfile() {
@@ -198,7 +224,7 @@ www.${DOMAIN} {
 EOF
 
   caddy fmt --overwrite "$CADDYFILE" >/dev/null 2>&1 || true
-  rc-service caddy reload || true
+  rc-service caddy reload >/dev/null 2>&1 || true
 }
 
 final_checks() {
@@ -217,6 +243,9 @@ final_checks() {
   echo "  - DNS A/AAAA for ${DOMAIN} points to this VPS"
   echo "  - Ports 80 and 443 are reachable inbound"
   echo ""
+  echo "Logs:"
+  echo "  tail -n 200 /var/log/${REPO_NAME}.log"
+  echo "  tail -n 200 /var/log/${REPO_NAME}.err"
 }
 
 main() {
@@ -230,6 +259,7 @@ main() {
   generate_github_deploy_key
   clone_and_build
   write_env_file
+  fix_permissions
   write_openrc_service
   write_caddyfile
   final_checks
