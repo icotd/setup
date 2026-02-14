@@ -34,7 +34,6 @@ retry() {
 }
 
 enable_repos() {
-  # Ensure community repo is enabled (often needed for extra packages)
   if [ -f /etc/apk/repositories ]; then
     sed -i -E 's|^#(https?://.*/v[0-9]+\.[0-9]+/community)$|\1|' /etc/apk/repositories || true
   fi
@@ -114,6 +113,7 @@ generate_github_deploy_key() {
   echo ""
   echo "Add this key in GitHub:"
   echo "  Repo -> Settings -> Deploy keys -> Add deploy key"
+  echo "  (Enable 'Allow write access' only if needed.)"
   echo ""
   printf "Press ENTER after you've added the key... "
   read -r _ || true
@@ -130,7 +130,6 @@ prepare_app_dirs() {
 }
 
 write_env_file() {
-  # NOTE: this env file is used both at BUILD time and RUN time.
   cat > "$ENV_FILE" <<EOF
 NODE_ENV=production
 HOST=127.0.0.1
@@ -138,7 +137,6 @@ PORT=3000
 DATABASE_URL=${APP_DIR}/data/data.db
 EOF
 
-  # allow deploy to read (service + build run as deploy and source this file)
   chown root:deploy "$ENV_FILE"
   chmod 0640 "$ENV_FILE"
 }
@@ -167,7 +165,7 @@ clone_and_build() {
       cp .env.example .env
     fi
 
-    # Ensure DATABASE_URL (and friends) are present during build, not just runtime.
+    # Ensure env is present at BUILD TIME (some apps read env during build)
     set -a
     . '$ENV_FILE'
     set +a
@@ -184,29 +182,51 @@ write_openrc_service() {
 name="${REPO_NAME}"
 description="${REPO_NAME} (SvelteKit on Bun)"
 
-directory="${APP_DIR}"
-pidfile="/run/\${RC_SVCNAME}.pid"
+APP_DIR="${APP_DIR}"
+ENV_FILE="/etc/${REPO_NAME}.env"
 
+command="/usr/local/bin/bun"
+command_args="\${APP_DIR}/build/index.js"
+command_user="deploy:deploy"
+directory="\${APP_DIR}"
+
+pidfile="/run/\${RC_SVCNAME}.pid"
 output_log="/var/log/\${RC_SVCNAME}.log"
 error_log="/var/log/\${RC_SVCNAME}.err"
 
 depend() { need net; }
 
-start() {
+start_pre() {
   checkpath -f -m 0644 -o deploy:deploy "\$output_log" "\$error_log"
 
-  supervise-daemon "\$RC_SVCNAME" \\
-    --user "deploy:deploy" \\
-    --chdir "\$directory" \\
-    --stdout "\$output_log" \\
-    --stderr "\$error_log" \\
-    --pidfile "\$pidfile" \\
+  if [ ! -f "\$ENV_FILE" ]; then
+    eerror "Missing \$ENV_FILE"
+    return 1
+  fi
+
+  # Export env for supervise-daemon to inherit
+  set -a
+  . "\$ENV_FILE"
+  set +a
+}
+
+start() {
+  ebegin "Starting \${RC_SVCNAME}"
+  supervise-daemon "\${RC_SVCNAME}" \\
+    --user "\${command_user}" \\
+    --chdir "\${directory}" \\
+    --stdout "\${output_log}" \\
+    --stderr "\${error_log}" \\
+    --pidfile "\${pidfile}" \\
     -- \\
-    /bin/sh -lc 'set -Eeuo pipefail; set -a; . /etc/${REPO_NAME}.env; set +a; exec /usr/local/bin/bun /var/www/${REPO_NAME}/build/index.js'
+    \${command} \${command_args}
+  eend \$?
 }
 
 stop() {
-  supervise-daemon "\$RC_SVCNAME" --stop --pidfile "\$pidfile"
+  ebegin "Stopping \${RC_SVCNAME}"
+  supervise-daemon "\${RC_SVCNAME}" --stop --pidfile "\${pidfile}"
+  eend \$?
 }
 EOF
 
@@ -238,17 +258,15 @@ final_checks() {
   rc-service "$REPO_NAME" status || true
   rc-service caddy status || true
   echo ""
-  echo "Try local proxy test:"
-  echo "  rc-service ${REPO_NAME} restart"
-  echo "  tail -n 80 /var/log/${REPO_NAME}.err"
+  echo "Local test:"
   echo "  curl -I http://127.0.0.1:3000"
   echo ""
-  echo "Then open:"
-  echo "  https://${DOMAIN}"
+  echo "Logs:"
+  echo "  tail -n 200 /var/log/${REPO_NAME}.err"
+  echo "  tail -n 200 /var/log/${REPO_NAME}.log"
   echo ""
-  echo "If you still see DATABASE_URL errors, verify the env file is readable and has the value:"
-  echo "  ls -l /etc/${REPO_NAME}.env"
-  echo "  cat /etc/${REPO_NAME}.env"
+  echo "Open:"
+  echo "  https://${DOMAIN}"
   echo ""
 }
 
@@ -262,8 +280,6 @@ main() {
   install_bun_for_deploy
   generate_github_deploy_key
 
-  # IMPORTANT ORDER:
-  # - create dirs + env BEFORE build so build-time code can read DATABASE_URL
   prepare_app_dirs
   write_env_file
   clone_and_build
