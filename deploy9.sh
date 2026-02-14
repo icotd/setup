@@ -14,31 +14,20 @@ SVC_FILE="/etc/init.d/${REPO_NAME}"
 CADDYFILE="/etc/caddy/Caddyfile"
 
 need_root() {
-  if [ "$(id -u)" -ne 0 ]; then
-    echo "Run as root." >&2
-    exit 1
-  fi
+  [ "$(id -u)" -eq 0 ] || { echo "Run as root." >&2; exit 1; }
 }
 
 enable_repos() {
-  # Ensure community repo is enabled (often needed for extra packages)
-  if [ -f /etc/apk/repositories ]; then
-    sed -i -E 's|^#(https?://.*/v[0-9]+\.[0-9]+/community)$|\1|' /etc/apk/repositories || true
-  fi
+  [ -f /etc/apk/repositories ] || return 0
+  sed -i -E 's|^#(https?://.*/v[0-9]+\.[0-9]+/community)$|\1|' /etc/apk/repositories || true
 }
 
 install_packages() {
   apk update
   apk add --no-cache \
-    bash \
-    openssh \
-    sudo \
-    curl \
-    git \
-    ca-certificates \
+    bash openssh sudo curl git ca-certificates \
     caddy \
-    libstdc++ \
-    libgcc \
+    libstdc++ libgcc \
     perl
   update-ca-certificates || true
 }
@@ -128,11 +117,8 @@ clone_and_build() {
     else
       git checkout -f
     fi
-    git pull --ff-only
 
-    if [ -f .env.example ] && [ ! -f .env ]; then
-      cp .env.example .env
-    fi
+    git pull --ff-only
 
     bun install --frozen-lockfile
     bun run build
@@ -146,18 +132,21 @@ HOST=127.0.0.1
 PORT=3000
 DATABASE_URL=${APP_DIR}/data/data.db
 EOF
-  chmod 600 "$ENV_FILE"
+
+  # service runs bun as deploy and sources this file
+  chown root:deploy "$ENV_FILE"
+  chmod 0640 "$ENV_FILE"
 }
 
 fix_permissions() {
-  mkdir -p "${APP_DIR}/data"
+  install -d -m 0775 -o deploy -g deploy "${APP_DIR}/data"
   touch "${APP_DIR}/data/data.db"
-  chown -R deploy:deploy "${APP_DIR}/data"
-  chmod 775 "${APP_DIR}/data"
-  chmod 664 "${APP_DIR}/data/data.db"
+  chown deploy:deploy "${APP_DIR}/data/data.db"
+  chmod 0664 "${APP_DIR}/data/data.db"
 }
 
 write_openrc_service() {
+  # Source ENV_FILE inside the supervised process (OpenRC exports don't propagate reliably).
   cat > "$SVC_FILE" <<EOF
 #!/sbin/openrc-run
 
@@ -184,7 +173,7 @@ start() {
     --stderr "\$error_log" \\
     --pidfile "\$pidfile" \\
     -- \\
-    /bin/sh -lc 'set -a; . "${ENV_FILE}"; set +a; exec /usr/local/bin/bun build/index.js'
+    /bin/sh -lc 'set -a; . /etc/${REPO_NAME}.env; set +a; exec /usr/local/bin/bun build/index.js'
 }
 
 stop() {
@@ -197,16 +186,6 @@ EOF
   rc-service "$REPO_NAME" restart
   rc-service "$REPO_NAME" status || true
 }
-
-# Optional: also ensure ENV_FILE is root-readable (service runs as root; fine at 0600 root:root)
-# But the *deploy* user will read it inside the shell, so allow read:
-# safest reasonable:
-#   chown root:deploy /etc/$REPO_NAME.env
-#   chmod 0640 /etc/$REPO_NAME.env
-
-# Add this right after write_env_file() in your one-go script:
-chmod 0640 "$ENV_FILE"
-chown root:deploy "$ENV_FILE"
 
 write_caddyfile() {
   cat > "$CADDYFILE" <<EOF
@@ -229,15 +208,11 @@ final_checks() {
   rc-service "$REPO_NAME" status || true
   rc-service caddy status || true
   echo ""
-  echo "Try local proxy test:"
+  echo "Local test:"
   echo "  curl -I http://127.0.0.1:3000"
   echo ""
-  echo "Then open:"
+  echo "Open:"
   echo "  https://${DOMAIN}"
-  echo ""
-  echo "If TLS doesn't issue, confirm:"
-  echo "  - DNS A/AAAA for ${DOMAIN} points to this VPS"
-  echo "  - Ports 80 and 443 are reachable inbound"
   echo ""
   echo "Logs:"
   echo "  tail -n 200 /var/log/${REPO_NAME}.log"
