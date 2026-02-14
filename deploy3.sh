@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Alpine all-in-one: Bun + private GitHub repo + OpenRC service + Caddy (Let's Encrypt)
 #
 # Run as root AFTER Alpine is installed & booted (not from ISO).
