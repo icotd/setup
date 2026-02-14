@@ -67,6 +67,12 @@ install_bun() {
   ln -sf /home/deploy/.bun/bin/bun /usr/local/bin/bun
 }
 
+prepare_app_dir() {
+  mkdir -p /var/www
+  mkdir -p "$APP_DIR"
+  chown -R deploy:deploy /var/www
+}
+
 clone_and_build() {
   su - deploy -c "
     set -Eeuo pipefail
@@ -78,7 +84,10 @@ clone_and_build() {
 
     cd '$APP_DIR'
     git fetch --all --prune
-    git pull --ff-only
+
+    default_branch=\$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||' || echo main)
+    git checkout -f \"\$default_branch\" || git checkout -f main || true
+    git pull --ff-only || true
 
     bun install --frozen-lockfile
     bun run build
@@ -150,6 +159,7 @@ main() {
   create_deploy_user
   setup_admin_ssh_key
   install_bun
+  prepare_app_dir
   clone_and_build
   write_service
   write_caddyfile
