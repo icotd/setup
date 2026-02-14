@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/bin/bash
 # Alpine all-in-one: Bun + private GitHub repo + OpenRC service + Caddy (Let's Encrypt)
 # Usage (as root):
 #   DOMAIN='brighton.ethsaas.cloud' GITHUB_USER='icotd' REPO_NAME='brighton-pms' ADMIN_PUBKEY='ssh-ed25519 AAAA... you@mac' sh setup.sh
