@@ -12,30 +12,59 @@ APP_DIR="/var/www/${REPO_NAME}"
 SVC_FILE="/etc/init.d/${REPO_NAME}"
 CADDYFILE="/etc/caddy/Caddyfile"
 
-need_root() {
-  [ "$(id -u)" -eq 0 ] || { echo "Run as root."; exit 1; }
-}
+need_root() { [ "$(id -u)" -eq 0 ] || { echo "Run as root."; exit 1; }; }
 
 retry() {
   local n=0 max=5 delay=2
   until "$@"; do
     n=$((n+1))
-    [ "$n" -ge "$max" ] && return 1
+    [ "$n" -ge "$max" ] && { echo "FAILED: $*"; return 1; }
     sleep "$delay"
     delay=$((delay*2))
   done
 }
 
+enable_repos() {
+  # ensure main/community are enabled; required for caddy/sudo on Alpine
+  if [ -f /etc/apk/repositories ]; then
+    sed -i -E 's|^#(https?://.*/v[0-9]+\.[0-9]+/main)$|\1|' /etc/apk/repositories || true
+    sed -i -E 's|^#(https?://.*/v[0-9]+\.[0-9]+/community)$|\1|' /etc/apk/repositories || true
+  fi
+}
+
 install_packages() {
+  enable_repos
   retry apk update
+
+  # base deps
   retry apk add --no-cache \
-    bash openssh sudo curl git ca-certificates \
-    caddy libstdc++ libgcc perl
+    bash openssh curl git ca-certificates \
+    libstdc++ libgcc perl
+
+  # sudo is optional; install if available
+  apk add --no-cache sudo >/dev/null 2>&1 || true
+
+  # caddy moved/varies; install whichever exists
+  if apk info -e caddy >/dev/null 2>&1; then
+    : # already installed
+  elif apk add --no-cache caddy >/dev/null 2>&1; then
+    :
+  elif apk add --no-cache caddy-openrc >/dev/null 2>&1; then
+    # some repos split openrc bits, but pulling this usually pulls caddy too
+    :
+  else
+    echo "ERROR: caddy not available in enabled repositories." >&2
+    echo "Fix /etc/apk/repositories for your Alpine version/arch, then re-run." >&2
+    exit 1
+  fi
+
+  update-ca-certificates || true
 }
 
 setup_services() {
   rc-update add sshd default >/dev/null 2>&1 || true
   rc-service sshd start >/dev/null 2>&1 || true
+
   rc-update add caddy default >/dev/null 2>&1 || true
   rc-service caddy start >/dev/null 2>&1 || true
 }
@@ -53,11 +82,14 @@ setup_admin_ssh_key() {
 
 install_bun() {
   su - deploy -c '
+    set -Eeuo pipefail
     if [ ! -x "$HOME/.bun/bin/bun" ]; then
       curl -fsSL https://bun.sh/install | bash
     fi
   '
+  mkdir -p /usr/local/bin
   ln -sf /home/deploy/.bun/bin/bun /usr/local/bin/bun
+  /usr/local/bin/bun --version >/dev/null 2>&1 || { echo "bun install/symlink failed"; exit 1; }
 }
 
 generate_github_key() {
@@ -69,6 +101,7 @@ generate_github_key() {
       ssh-keygen -t ed25519 -C "vps-deploy" -N "" -f "$HOME/.ssh/id_ed25519"
     fi
 
+    # avoid interactive host verification
     ssh-keyscan github.com >> "$HOME/.ssh/known_hosts" 2>/dev/null
     chmod 600 "$HOME/.ssh/known_hosts"
   '
@@ -87,6 +120,7 @@ generate_github_key() {
 }
 
 prepare_app_dir() {
+  mkdir -p /var/www
   mkdir -p "$APP_DIR"
   chown -R deploy:deploy /var/www
 }
@@ -151,9 +185,11 @@ EOF
   chmod +x "$SVC_FILE"
   rc-update add "$REPO_NAME" default >/dev/null 2>&1 || true
   rc-service "$REPO_NAME" restart || true
+  rc-service "$REPO_NAME" status || true
 }
 
 write_caddyfile() {
+  mkdir -p /etc/caddy
   cat > "$CADDYFILE" <<EOF
 ${DOMAIN} {
   encode zstd gzip
