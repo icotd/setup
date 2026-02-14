@@ -26,17 +26,11 @@ retry() {
   done
 }
 
-enable_repos() {
-  [ -f /etc/apk/repositories ] && \
-  sed -i -E 's|^#(https?://.*/v[0-9]+\.[0-9]+/community)$|\1|' /etc/apk/repositories || true
-}
-
 install_packages() {
   retry apk update
   retry apk add --no-cache \
     bash openssh sudo curl git ca-certificates \
     caddy libstdc++ libgcc perl
-  update-ca-certificates || true
 }
 
 setup_services() {
@@ -48,7 +42,6 @@ setup_services() {
 
 create_deploy_user() {
   id deploy >/dev/null 2>&1 || adduser -D -s /bin/ash deploy
-  addgroup deploy wheel >/dev/null 2>&1 || true
 }
 
 setup_admin_ssh_key() {
@@ -67,6 +60,31 @@ install_bun() {
   ln -sf /home/deploy/.bun/bin/bun /usr/local/bin/bun
 }
 
+generate_github_key() {
+  su - deploy -c '
+    set -Eeuo pipefail
+    install -d -m 700 "$HOME/.ssh"
+
+    if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
+      ssh-keygen -t ed25519 -C "vps-deploy" -N "" -f "$HOME/.ssh/id_ed25519"
+    fi
+
+    # preload github host to avoid interactive prompt
+    ssh-keyscan github.com >> "$HOME/.ssh/known_hosts" 2>/dev/null
+    chmod 600 "$HOME/.ssh/known_hosts"
+  '
+
+  echo ""
+  echo "================== GITHUB DEPLOY KEY =================="
+  su - deploy -c 'cat "$HOME/.ssh/id_ed25519.pub"'
+  echo "======================================================="
+  echo ""
+  echo "Add this key to:"
+  echo "Repo -> Settings -> Deploy keys -> Add deploy key"
+  echo ""
+  read -p "Press ENTER after adding the key..."
+}
+
 prepare_app_dir() {
   mkdir -p "$APP_DIR"
   chown -R deploy:deploy /var/www
@@ -78,7 +96,7 @@ clone_and_build() {
     export PATH=\$HOME/.bun/bin:\$PATH
 
     if [ ! -d '$APP_DIR/.git' ]; then
-      git clone 'git@github.com:${GITHUB_USER}/${REPO_NAME}.git' '$APP_DIR'
+      git clone git@github.com:${GITHUB_USER}/${REPO_NAME}.git '$APP_DIR'
     fi
 
     cd '$APP_DIR'
@@ -152,12 +170,12 @@ EOF
 
 main() {
   need_root
-  enable_repos
   install_packages
   setup_services
   create_deploy_user
   setup_admin_ssh_key
   install_bun
+  generate_github_key
   prepare_app_dir
   clone_and_build
   write_service
