@@ -187,7 +187,7 @@ start_pre() {
   checkpath -f -m 0644 -o deploy:deploy "\$output_log" "\$error_log"
   export NODE_ENV="production"
   export PORT="3000"
-  export HOST="127.0.0.1"
+  export HOST="0.0.0.0"
 }
 
 start() {
