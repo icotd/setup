@@ -141,19 +141,15 @@ write_env_file() {
 NODE_ENV=production
 HOST=127.0.0.1
 PORT=3000
+DATABASE_URL=/var/www/brighton-pms/data/data.db
 EOF
   chmod 600 "$ENV_FILE"
 }
 
 write_openrc_service() {
-  : "${ENTRY_FILE:?Set ENTRY_FILE to your built server entry (e.g. /var/www/$REPO_NAME/build/index.js)}"
-
-  if [ ! -f "$ENTRY_FILE" ]; then
-    echo "ERROR: ENTRY_FILE does not exist: $ENTRY_FILE" >&2
-    echo "Build dir contents:" >&2
-    ls -la "${APP_DIR}/build" >&2 || true
-    return 1
-  fi
+  [ -d "$APP_DIR" ] || { echo "APP_DIR not found: $APP_DIR" >&2; return 1; }
+  [ -f "$APP_DIR/build/index.js" ] || { echo "Missing: $APP_DIR/build/index.js" >&2; ls -la "$APP_DIR/build" >&2 || true; return 1; }
+  [ -x /home/deploy/.bun/bin/bun ] || { echo "Missing bun: /home/deploy/.bun/bin/bun" >&2; return 1; }
 
   cat > "$SVC_FILE" <<EOF
 #!/sbin/openrc-run
@@ -161,12 +157,15 @@ write_openrc_service() {
 name="${REPO_NAME}"
 description="SvelteKit on Bun (${REPO_NAME})"
 
+directory="${APP_DIR}"
+
 command="/home/deploy/.bun/bin/bun"
-command_args="${ENTRY_FILE}"
-command_user="deploy"
+command_args="build/index.js"
+command_user="deploy:deploy"
 
 command_background="yes"
 pidfile="/run/\${RC_SVCNAME}.pid"
+
 output_log="/var/log/\${RC_SVCNAME}.log"
 error_log="/var/log/\${RC_SVCNAME}.err"
 
@@ -176,7 +175,6 @@ depend() {
 
 start_pre() {
   checkpath --file --owner deploy:deploy --mode 0644 "\$output_log" "\$error_log"
-
   if [ -f "${ENV_FILE}" ]; then
     set -a
     . "${ENV_FILE}"
@@ -186,12 +184,6 @@ start_pre() {
 EOF
 
   chmod +x "$SVC_FILE"
-  rc-update add "$REPO_NAME" default >/dev/null 2>&1 || true
-
-  echo "Service written: $SVC_FILE"
-  echo "Will run as deploy: /home/deploy/.bun/bin/bun $ENTRY_FILE"
-
-  rc-service "$REPO_NAME" restart
 }
 
 write_caddyfile() {
