@@ -1,4 +1,7 @@
 ```
+curl -sLS https://raw.githubusercontent.com/icotd/setup/main/colima-docker-remover.sh | bash
+```
+```
 curl -sLS https://raw.githubusercontent.com/icotd/setup/main/valhalla.sh | bash
 ```
 ```
