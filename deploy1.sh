@@ -9,11 +9,37 @@ umask 027
 : "${ADMIN_PUBKEY:?Missing ADMIN_PUBKEY}"
 
 APP_DIR="/var/www/${REPO_NAME}"
+ENV_FILE="${APP_DIR}/.env"
 SVC_FILE="/etc/init.d/${REPO_NAME}"
 CADDYFILE="/etc/caddy/Caddyfile"
 APK_REPOS="/etc/apk/repositories"
 
 need_root() { [ "$(id -u)" -eq 0 ] || { echo "Run as root."; exit 1; }; }
+
+is_placeholder_secret() {
+  case "$(printf '%s' "${1:-}" | tr -d '[:space:]')" in
+    ""|"change-me"|"default-secret-change-me"|"change-me-backup-key")
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+generate_app_secret() {
+  openssl rand -base64 48 | tr -d '\n'
+}
+
+upsert_env_value() {
+  local key="$1" value="$2" file="$3"
+  touch "$file"
+  if grep -Eq "^${key}=" "$file"; then
+    sed -i "s|^${key}=.*$|${key}=${value}|" "$file"
+  else
+    printf "%s=%s\n" "$key" "$value" >>"$file"
+  fi
+}
 
 retry() {
   local n=0 max=5 delay=2
@@ -62,7 +88,7 @@ install_packages() {
   retry apk update
 
   retry apk add --no-cache \
-    bash openssh curl git ca-certificates \
+    bash openssh curl git ca-certificates openssl \
     libstdc++ libgcc perl
 
   retry apk add --no-cache libcap
@@ -130,6 +156,26 @@ prepare_app_dir() {
   chown -R deploy:deploy /var/www
 }
 
+ensure_app_env() {
+  local existing_secret app_secret
+
+  touch "$ENV_FILE"
+  chown deploy:deploy "$ENV_FILE"
+  chmod 600 "$ENV_FILE"
+
+  existing_secret="$(grep -E '^APP_SECRET=' "$ENV_FILE" | tail -n 1 | cut -d= -f2- || true)"
+  app_secret="${APP_SECRET:-$existing_secret}"
+
+  if is_placeholder_secret "$app_secret"; then
+    app_secret="$(generate_app_secret)"
+    echo "Generated APP_SECRET and saved it to ${ENV_FILE}"
+  fi
+
+  upsert_env_value "APP_SECRET" "$app_secret" "$ENV_FILE"
+  chown deploy:deploy "$ENV_FILE"
+  chmod 600 "$ENV_FILE"
+}
+
 clone_and_build() {
   su - deploy -c "
     set -Eeuo pipefail
@@ -145,7 +191,15 @@ clone_and_build() {
     default_branch=\$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||' || echo main)
     git checkout -f \"\$default_branch\" || git checkout -f main
     git pull --ff-only
+  "
 
+  ensure_app_env
+
+  su - deploy -c "
+    set -Eeuo pipefail
+    export PATH=\$HOME/.bun/bin:\$PATH
+
+    cd '$APP_DIR'
     bun install --frozen-lockfile
     bun run build
 
