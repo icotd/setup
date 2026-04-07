@@ -10,6 +10,7 @@ umask 027
 
 APP_DIR="/var/www/${REPO_NAME}"
 ENV_FILE="${APP_DIR}/.env"
+DEFAULT_DATABASE_URL="db/dbs/default/data"
 SVC_FILE="/etc/init.d/${REPO_NAME}"
 CADDYFILE="/etc/caddy/Caddyfile"
 APK_REPOS="/etc/apk/repositories"
@@ -157,7 +158,7 @@ prepare_app_dir() {
 }
 
 ensure_app_env() {
-  local existing_secret app_secret
+  local existing_secret app_secret existing_database_url database_url database_dir
 
   touch "$ENV_FILE"
   chown deploy:deploy "$ENV_FILE"
@@ -165,12 +166,33 @@ ensure_app_env() {
 
   existing_secret="$(grep -E '^APP_SECRET=' "$ENV_FILE" | tail -n 1 | cut -d= -f2- || true)"
   app_secret="${APP_SECRET:-$existing_secret}"
+  existing_database_url="$(grep -E '^DATABASE_URL=' "$ENV_FILE" | tail -n 1 | cut -d= -f2- || true)"
+  database_url="${DATABASE_URL:-$existing_database_url}"
 
   if is_placeholder_secret "$app_secret"; then
     app_secret="$(generate_app_secret)"
     echo "Generated APP_SECRET and saved it to ${ENV_FILE}"
   fi
 
+  if [ -z "$(printf '%s' "$database_url" | tr -d '[:space:]')" ]; then
+    database_url="$DEFAULT_DATABASE_URL"
+    echo "Set DATABASE_URL to ${database_url} in ${ENV_FILE}"
+  fi
+
+  case "$database_url" in
+    file:*)
+      database_dir="${database_url#file:}"
+      ;;
+    *)
+      database_dir="$database_url"
+      ;;
+  esac
+  if [ "$database_dir" != ":memory:" ]; then
+    mkdir -p "$APP_DIR/$(dirname "$database_dir")"
+    chown -R deploy:deploy "$APP_DIR/db"
+  fi
+
+  upsert_env_value "DATABASE_URL" "$database_url" "$ENV_FILE"
   upsert_env_value "APP_SECRET" "$app_secret" "$ENV_FILE"
   chown deploy:deploy "$ENV_FILE"
   chmod 600 "$ENV_FILE"
