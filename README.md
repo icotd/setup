@@ -2,6 +2,9 @@
 curl -sLS https://raw.githubusercontent.com/icotd/setup/main/colima-docker-remover.sh | bash
 ```
 ```
+curl -sLS https://raw.githubusercontent.com/icotd/setup/main/colima-docker-remover.sh | MINIO_USER=admin MINIO_PASS='your-secret' MINIO_BUCKET=app-storage bash
+```
+```
 curl -sLS https://raw.githubusercontent.com/icotd/setup/main/valhalla.sh | bash
 ```
 ```
