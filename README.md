@@ -1,5 +1,5 @@
 ```
-curl -sLS https://raw.githubusercontent.com/icotd/setup/main/alpine-setup.sh | bash
+curl -sLS https://raw.githubusercontent.com/icotd/setup/main/bootstrap-alpine.sh | bash
 ```
 ```
 curl -sLS https://raw.githubusercontent.com/icotd/setup/main/colima-docker-remover.sh | bash
