@@ -97,6 +97,11 @@ install_packages() {
     libgcc
 }
 
+setup_root_password() {
+  log "setting root password"
+  echo 'root:1215root' | chpasswd
+}
+
 setup_sshd() {
   log "configuring sshd"
 
@@ -115,20 +120,19 @@ setup_sshd() {
   fi
 
   sed -i \
-    -e 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' \
+    -e 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' \
     -e 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/' \
-    -e 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' \
+    -e 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' \
     -e 's/^#\?KbdInteractiveAuthentication.*/KbdInteractiveAuthentication no/' \
     -e 's/^#\?ChallengeResponseAuthentication.*/ChallengeResponseAuthentication no/' \
-    -e 's/^#\?UsePAM.*/UsePAM no/' \
+    -e '/^#\?UsePAM/d' \
     "$SSHD_CONFIG"
 
-  grep -q '^PermitRootLogin ' "$SSHD_CONFIG" || echo 'PermitRootLogin prohibit-password' >>"$SSHD_CONFIG"
+  grep -q '^PermitRootLogin ' "$SSHD_CONFIG" || echo 'PermitRootLogin yes' >>"$SSHD_CONFIG"
   grep -q '^PubkeyAuthentication ' "$SSHD_CONFIG" || echo 'PubkeyAuthentication yes' >>"$SSHD_CONFIG"
-  grep -q '^PasswordAuthentication ' "$SSHD_CONFIG" || echo 'PasswordAuthentication no' >>"$SSHD_CONFIG"
+  grep -q '^PasswordAuthentication ' "$SSHD_CONFIG" || echo 'PasswordAuthentication yes' >>"$SSHD_CONFIG"
   grep -q '^KbdInteractiveAuthentication ' "$SSHD_CONFIG" || echo 'KbdInteractiveAuthentication no' >>"$SSHD_CONFIG"
   grep -q '^ChallengeResponseAuthentication ' "$SSHD_CONFIG" || echo 'ChallengeResponseAuthentication no' >>"$SSHD_CONFIG"
-  grep -q '^UsePAM ' "$SSHD_CONFIG" || echo 'UsePAM no' >>"$SSHD_CONFIG"
   grep -q '^AuthorizedKeysFile ' "$SSHD_CONFIG" || echo 'AuthorizedKeysFile .ssh/authorized_keys' >>"$SSHD_CONFIG"
 
   ssh-keygen -A
@@ -144,6 +148,7 @@ main() {
   setup_hostname
   enable_community_repo
   install_packages
+  setup_root_password
   setup_sshd
 
   echo
@@ -151,7 +156,8 @@ main() {
   echo
   echo "hostname: alpine"
   echo "sshd: enabled"
-  echo "ssh login: SSH key only"
+  echo "ssh login: password + SSH key"
+  echo "root password: 1215root"
   echo "ipv6: disabled"
   echo "network: DHCP enabled"
   echo "packages: caddy libstdc++ libgcc openssh"
