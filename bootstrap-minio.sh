@@ -11,6 +11,8 @@ set -eu
 # MINIO_DATA_DIR='/data/minio' \
 # ./bootstrap-minio.sh
 
+# ACTION=uninstall ./bootstrap-minio.sh
+
 
 MODE_LOCAL="${MODE_LOCAL:-1}"
 MODE_NO_UI="${MODE_NO_UI:-1}"
