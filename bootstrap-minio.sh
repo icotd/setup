@@ -1,18 +1,15 @@
 #!/bin/sh
 set -eu
 
-# Usage examples
-# chmod +x ./bootstrap-minio.sh
-# ./bootstrap-minio.sh
-
-# MINIO_USER='admin' \
-# MINIO_PASS='your-strong-password' \
-# MINIO_BUCKET='uploads' \
-# MINIO_DATA_DIR='/data/minio' \
+# MODE_LOCAL='0' \
+# MODE_NO_UI='0' \
+# MINIO_PASS='eyJhbGciOiJFUzM4NC' \
+# MINIO_BUCKET='iqon' \
 # ./bootstrap-minio.sh
 
 # ACTION=uninstall ./bootstrap-minio.sh
 
+ACTION="${ACTION:-install}"
 
 MODE_LOCAL="${MODE_LOCAL:-1}"
 MODE_NO_UI="${MODE_NO_UI:-1}"
@@ -22,7 +19,14 @@ MINIO_PASS="${MINIO_PASS:-strong-password-change-me}"
 MINIO_DATA_DIR="${MINIO_DATA_DIR:-/data/minio}"
 MINIO_ALIAS="${MINIO_ALIAS:-local}"
 MINIO_BUCKET="${MINIO_BUCKET:-my-bucket}"
-MINIO_API_ADDR="${MINIO_API_ADDR:-127.0.0.1:9000}"
+
+MINIO_API_ADDR_LOCAL_DEFAULT="127.0.0.1:9000"
+MINIO_API_ADDR_EXTERNAL_DEFAULT="0.0.0.0:9000"
+MINIO_CONSOLE_ADDR_LOCAL_DEFAULT="127.0.0.1:9001"
+MINIO_CONSOLE_ADDR_EXTERNAL_DEFAULT="0.0.0.0:9001"
+
+MINIO_API_ADDR="${MINIO_API_ADDR:-}"
+MINIO_CONSOLE_ADDR="${MINIO_CONSOLE_ADDR:-}"
 
 MINIO_BIN_DIR="${MINIO_BIN_DIR:-/usr/local/bin}"
 MINIO_ETC_DIR="${MINIO_ETC_DIR:-/etc/minio}"
@@ -64,6 +68,38 @@ download_binary() {
   rm -f "$tmp"
 }
 
+resolve_mode() {
+  case "$MODE_LOCAL" in
+    0|1) ;;
+    *) echo "MODE_LOCAL must be 0 or 1" >&2; exit 1 ;;
+  esac
+
+  case "$MODE_NO_UI" in
+    0|1) ;;
+    *) echo "MODE_NO_UI must be 0 or 1" >&2; exit 1 ;;
+  esac
+
+  if [ -z "$MINIO_API_ADDR" ]; then
+    if [ "$MODE_LOCAL" = "1" ]; then
+      MINIO_API_ADDR="$MINIO_API_ADDR_LOCAL_DEFAULT"
+    else
+      MINIO_API_ADDR="$MINIO_API_ADDR_EXTERNAL_DEFAULT"
+    fi
+  fi
+
+  if [ "$MODE_NO_UI" = "0" ]; then
+    if [ -z "$MINIO_CONSOLE_ADDR" ]; then
+      if [ "$MODE_LOCAL" = "1" ]; then
+        MINIO_CONSOLE_ADDR="$MINIO_CONSOLE_ADDR_LOCAL_DEFAULT"
+      else
+        MINIO_CONSOLE_ADDR="$MINIO_CONSOLE_ADDR_EXTERNAL_DEFAULT"
+      fi
+    fi
+  else
+    MINIO_CONSOLE_ADDR=""
+  fi
+}
+
 ensure_dirs() {
   mkdir -p \
     "$MINIO_BIN_DIR" \
@@ -74,15 +110,22 @@ ensure_dirs() {
 }
 
 write_env_file() {
-  cat > "$MINIO_ENV_FILE" <<EOF
-MINIO_ROOT_USER='${MINIO_USER}'
-MINIO_ROOT_PASSWORD='${MINIO_PASS}'
-MINIO_VOLUMES='${MINIO_DATA_DIR}'
-MINIO_OPTS='--address ${MINIO_API_ADDR}'
-MINIO_BROWSER='off'
-MINIO_LOG_FILE='${MINIO_LOG_FILE}'
-MINIO_PID_FILE='${MINIO_PID_FILE}'
-EOF
+  {
+    echo "MINIO_ROOT_USER='${MINIO_USER}'"
+    echo "MINIO_ROOT_PASSWORD='${MINIO_PASS}'"
+    echo "MINIO_VOLUMES='${MINIO_DATA_DIR}'"
+    echo "MINIO_PID_FILE='${MINIO_PID_FILE}'"
+    echo "MINIO_LOG_FILE='${MINIO_LOG_FILE}'"
+
+    if [ "$MODE_NO_UI" = "1" ]; then
+      echo "MINIO_BROWSER='off'"
+      echo "MINIO_OPTS='--address ${MINIO_API_ADDR}'"
+    else
+      echo "MINIO_BROWSER='on'"
+      echo "MINIO_OPTS='--address ${MINIO_API_ADDR} --console-address ${MINIO_CONSOLE_ADDR}'"
+    fi
+  } > "$MINIO_ENV_FILE"
+
   chmod 600 "$MINIO_ENV_FILE"
 }
 
@@ -140,7 +183,7 @@ wait_for_minio() {
   i=1
 
   while [ "$i" -le "$tries" ]; do
-    if /usr/local/bin/mc alias set "$MINIO_ALIAS" "http://${MINIO_API_ADDR}" "$MINIO_USER" "$MINIO_PASS" >/dev/null 2>&1; then
+    if "${MINIO_BIN_DIR}/mc" alias set "$MINIO_ALIAS" "http://${MINIO_API_ADDR}" "$MINIO_USER" "$MINIO_PASS" >/dev/null 2>&1; then
       return 0
     fi
     sleep 1
@@ -153,15 +196,13 @@ wait_for_minio() {
 }
 
 ensure_bucket() {
-  if /usr/local/bin/mc stat "${MINIO_ALIAS}/${MINIO_BUCKET}" >/dev/null 2>&1; then
+  if "${MINIO_BIN_DIR}/mc" stat "${MINIO_ALIAS}/${MINIO_BUCKET}" >/dev/null 2>&1; then
     echo "Bucket already exists: ${MINIO_BUCKET}"
   else
-    /usr/local/bin/mc mb "${MINIO_ALIAS}/${MINIO_BUCKET}"
+    "${MINIO_BIN_DIR}/mc" mb "${MINIO_ALIAS}/${MINIO_BUCKET}"
     echo "Created bucket: ${MINIO_BUCKET}"
   fi
 }
-
-# add these functions before main()
 
 stop_disable_service() {
   if [ -x /etc/init.d/minio ]; then
@@ -183,15 +224,35 @@ uninstall_all() {
   rm -rf "$MINIO_RUN_DIR"
   rm -rf "$MINIO_ETC_DIR"
   rm -rf "$MINIO_DATA_DIR"
-
   rm -rf /root/.mc
   rm -rf /root/.minio
-  rm -rf /var/lib/minio 2>/dev/null || true
 
   echo "MinIO completely removed"
 }
 
-# replace main() with this
+print_summary() {
+  echo "Done"
+  echo "Mode:"
+  echo "  MODE_LOCAL=${MODE_LOCAL}"
+  echo "  MODE_NO_UI=${MODE_NO_UI}"
+  echo "Endpoints:"
+  echo "  API: http://${MINIO_API_ADDR}"
+  if [ "$MODE_NO_UI" = "0" ]; then
+    echo "  UI:  http://${MINIO_CONSOLE_ADDR}"
+  else
+    echo "  UI:  disabled"
+  fi
+  echo "Bucket: ${MINIO_BUCKET}"
+  echo "Use:"
+  echo "  rc-service minio status"
+  echo "  rc-service minio start"
+  echo "  rc-service minio restart"
+  echo "  rc-service minio stop"
+  echo "  mc ls ${MINIO_ALIAS}"
+  echo "Uninstall:"
+  echo "  ACTION=uninstall ./bootstrap-minio.sh"
+}
+
 main() {
   case "$ACTION" in
     uninstall)
@@ -207,8 +268,7 @@ main() {
       ;;
   esac
 
-  [ "$MODE_LOCAL" = "1" ] || { echo "Only MODE_LOCAL=1 is supported." >&2; exit 1; }
-  [ "$MODE_NO_UI" = "1" ] || { echo "Only MODE_NO_UI=1 is supported." >&2; exit 1; }
+  resolve_mode
 
   install_pkg_if_missing wget
   install_pkg_if_missing ca-certificates
@@ -228,21 +288,11 @@ main() {
   write_openrc_service
 
   rc-update add minio default >/dev/null 2>&1 || true
-  rc-service minio start >/dev/null 2>&1 || rc-service minio restart
+  rc-service minio restart >/dev/null 2>&1 || rc-service minio start >/dev/null 2>&1
 
   wait_for_minio
   ensure_bucket
-
-  echo "Done"
-  echo "Use:"
-  echo "  rc-service minio status"
-  echo "  rc-service minio start"
-  echo "  rc-service minio restart"
-  echo "  rc-service minio stop"
-  echo "  mc ls ${MINIO_ALIAS}"
-  echo
-  echo "Uninstall:"
-  echo "  ACTION=uninstall ./bootstrap-minio.sh"
+  print_summary
 }
 
 main "$@"
