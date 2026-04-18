@@ -1,6 +1,17 @@
 #!/bin/sh
 set -eu
 
+# Usage examples
+# chmod +x ./bootstrap-minio.sh
+# ./bootstrap-minio.sh
+
+# MINIO_USER='admin' \
+# MINIO_PASS='your-strong-password' \
+# MINIO_BUCKET='uploads' \
+# MINIO_DATA_DIR='/data/minio' \
+# ./bootstrap-minio.sh
+
+
 MODE_LOCAL="${MODE_LOCAL:-1}"
 MODE_NO_UI="${MODE_NO_UI:-1}"
 
