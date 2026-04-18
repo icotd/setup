@@ -159,7 +159,52 @@ ensure_bucket() {
   fi
 }
 
+# add these functions before main()
+
+stop_disable_service() {
+  if [ -x /etc/init.d/minio ]; then
+    rc-service minio stop >/dev/null 2>&1 || true
+    rc-update del minio default >/dev/null 2>&1 || true
+  fi
+}
+
+uninstall_all() {
+  stop_disable_service
+
+  rm -f /etc/init.d/minio
+  rm -f "$MINIO_ENV_FILE"
+  rm -f "${MINIO_BIN_DIR}/minio"
+  rm -f "${MINIO_BIN_DIR}/mc"
+  rm -f "$MINIO_PID_FILE"
+  rm -f "$MINIO_LOG_FILE"
+
+  rm -rf "$MINIO_RUN_DIR"
+  rm -rf "$MINIO_ETC_DIR"
+  rm -rf "$MINIO_DATA_DIR"
+
+  rm -rf /root/.mc
+  rm -rf /root/.minio
+  rm -rf /var/lib/minio 2>/dev/null || true
+
+  echo "MinIO completely removed"
+}
+
+# replace main() with this
 main() {
+  case "$ACTION" in
+    uninstall)
+      uninstall_all
+      exit 0
+      ;;
+    install)
+      ;;
+    *)
+      echo "Unsupported ACTION: $ACTION" >&2
+      echo "Use ACTION=install or ACTION=uninstall" >&2
+      exit 1
+      ;;
+  esac
+
   [ "$MODE_LOCAL" = "1" ] || { echo "Only MODE_LOCAL=1 is supported." >&2; exit 1; }
   [ "$MODE_NO_UI" = "1" ] || { echo "Only MODE_NO_UI=1 is supported." >&2; exit 1; }
 
@@ -193,6 +238,9 @@ main() {
   echo "  rc-service minio restart"
   echo "  rc-service minio stop"
   echo "  mc ls ${MINIO_ALIAS}"
+  echo
+  echo "Uninstall:"
+  echo "  ACTION=uninstall ./bootstrap-minio.sh"
 }
 
 main "$@"
