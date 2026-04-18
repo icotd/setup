@@ -1,4 +1,7 @@
 ```
+curl -sLS https://raw.githubusercontent.com/icotd/setup/main/bootstrap-minio.sh | MODE_LOCAL='0' MINIO_PASS='your-secret' MINIO_BUCKET=uploads
+```
+```
 curl -sLS https://raw.githubusercontent.com/icotd/setup/main/bootstrap-alpine.sh | bash
 ```
 ```
