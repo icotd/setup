@@ -1,13 +1,6 @@
 #!/bin/sh
 set -eu
 
-# Alpine MinIO Community Edition bootstrap with OpenRC
-# - LOCAL only: binds S3 API to 127.0.0.1:9000
-# - NO-UI only: disables MinIO Console/UI
-# - installs upstream MinIO CE + mc
-# - creates OpenRC service: rc-service minio {start|stop|restart|status}
-# - adds service to default runlevel
-
 MODE_LOCAL="${MODE_LOCAL:-1}"
 MODE_NO_UI="${MODE_NO_UI:-1}"
 
@@ -24,13 +17,11 @@ MINIO_ENV_FILE="${MINIO_ENV_FILE:-/etc/minio/minio.env}"
 MINIO_LOG_FILE="${MINIO_LOG_FILE:-/var/log/minio/minio.log}"
 MINIO_RUN_DIR="${MINIO_RUN_DIR:-/run/minio}"
 MINIO_PID_FILE="${MINIO_PID_FILE:-/run/minio/minio.pid}"
-MINIO_USER_SYSTEM="${MINIO_USER_SYSTEM:-root}"
-MINIO_GROUP_SYSTEM="${MINIO_GROUP_SYSTEM:-root}"
 
 ARCH="$(uname -m)"
 case "$ARCH" in
   aarch64|arm64) MINIO_ARCH="linux-arm64" ;;
-  x86_64|amd64)  MINIO_ARCH="linux-amd64" ;;
+  x86_64|amd64) MINIO_ARCH="linux-amd64" ;;
   *)
     echo "Unsupported architecture: $ARCH" >&2
     exit 1
@@ -45,16 +36,15 @@ need_cmd() {
 }
 
 install_pkg_if_missing() {
-  local pkg="$1"
+  pkg="$1"
   if ! apk info -e "$pkg" >/dev/null 2>&1; then
     apk add --no-cache "$pkg"
   fi
 }
 
 download_binary() {
-  local url="$1"
-  local name="$2"
-  local tmp
+  url="$1"
+  name="$2"
   tmp="$(mktemp)"
   wget -qO "$tmp" "$url"
   install -m 0755 "$tmp" "${MINIO_BIN_DIR}/${name}"
@@ -62,7 +52,12 @@ download_binary() {
 }
 
 ensure_dirs() {
-  mkdir -p "$MINIO_BIN_DIR" "$MINIO_ETC_DIR" "$MINIO_DATA_DIR" "$(dirname "$MINIO_LOG_FILE")" "$MINIO_RUN_DIR"
+  mkdir -p \
+    "$MINIO_BIN_DIR" \
+    "$MINIO_ETC_DIR" \
+    "$MINIO_DATA_DIR" \
+    "$(dirname "$MINIO_LOG_FILE")" \
+    "$MINIO_RUN_DIR"
 }
 
 write_env_file() {
@@ -86,47 +81,41 @@ name="MinIO"
 description="MinIO Community Edition object storage"
 
 command="/usr/local/bin/minio"
-command_background="yes"
-pidfile="/run/minio/minio.pid"
-output_log="/var/log/minio/minio.log"
-error_log="/var/log/minio/minio.log"
 
 depend() {
   need net
 }
 
 start_pre() {
-  checkpath -d -m 0755 -o root:root /run/minio
-  checkpath -d -m 0755 -o root:root /var/log/minio
-  checkpath -d -m 0755 -o root:root /etc/minio
-  checkpath -d -m 0755 -o root:root /data/minio
   [ -f /etc/minio/minio.env ] || return 1
-  # shellcheck disable=SC1091
   . /etc/minio/minio.env
-  export MINIO_ROOT_USER MINIO_ROOT_PASSWORD MINIO_BROWSER
+
+  checkpath -d -m 0755 -o root:root /run/minio
+  checkpath -d -m 0755 -o root:root "$(dirname "$MINIO_LOG_FILE")"
+  checkpath -d -m 0755 -o root:root "$MINIO_VOLUMES"
 }
 
 start() {
-  # shellcheck disable=SC1091
   . /etc/minio/minio.env
   export MINIO_ROOT_USER MINIO_ROOT_PASSWORD MINIO_BROWSER
+
   ebegin "Starting MinIO"
   start-stop-daemon \
     --start \
     --background \
     --make-pidfile \
-    --pidfile "${MINIO_PID_FILE:-/run/minio/minio.pid}" \
-    --stdout "${MINIO_LOG_FILE:-/var/log/minio/minio.log}" \
-    --stderr "${MINIO_LOG_FILE:-/var/log/minio/minio.log}" \
-    --exec "$command" -- server ${MINIO_OPTS} "${MINIO_VOLUMES}"
+    --pidfile "$MINIO_PID_FILE" \
+    --stdout "$MINIO_LOG_FILE" \
+    --stderr "$MINIO_LOG_FILE" \
+    --exec "$command" -- server $MINIO_OPTS "$MINIO_VOLUMES"
   eend $?
 }
 
 stop() {
-  # shellcheck disable=SC1091
   . /etc/minio/minio.env
+
   ebegin "Stopping MinIO"
-  start-stop-daemon --stop --pidfile "${MINIO_PID_FILE:-/run/minio/minio.pid}"
+  start-stop-daemon --stop --pidfile "$MINIO_PID_FILE"
   eend $?
 }
 EOF
@@ -134,8 +123,8 @@ EOF
 }
 
 wait_for_minio() {
-  local tries=60
-  local i=1
+  tries=60
+  i=1
 
   while [ "$i" -le "$tries" ]; do
     if /usr/local/bin/mc alias set "$MINIO_ALIAS" "http://${MINIO_API_ADDR}" "$MINIO_USER" "$MINIO_PASS" >/dev/null 2>&1; then
@@ -151,7 +140,7 @@ wait_for_minio() {
 }
 
 ensure_bucket() {
-  if /usr/local/bin/mc ls "${MINIO_ALIAS}/${MINIO_BUCKET}" >/dev/null 2>&1; then
+  if /usr/local/bin/mc stat "${MINIO_ALIAS}/${MINIO_BUCKET}" >/dev/null 2>&1; then
     echo "Bucket already exists: ${MINIO_BUCKET}"
   else
     /usr/local/bin/mc mb "${MINIO_ALIAS}/${MINIO_BUCKET}"
@@ -160,8 +149,8 @@ ensure_bucket() {
 }
 
 main() {
-  [ "$MODE_LOCAL" = "1" ] || { echo "Only MODE_LOCAL=1 is supported."; exit 1; }
-  [ "$MODE_NO_UI" = "1" ] || { echo "Only MODE_NO_UI=1 is supported."; exit 1; }
+  [ "$MODE_LOCAL" = "1" ] || { echo "Only MODE_LOCAL=1 is supported." >&2; exit 1; }
+  [ "$MODE_NO_UI" = "1" ] || { echo "Only MODE_NO_UI=1 is supported." >&2; exit 1; }
 
   install_pkg_if_missing wget
   install_pkg_if_missing ca-certificates
@@ -181,7 +170,7 @@ main() {
   write_openrc_service
 
   rc-update add minio default >/dev/null 2>&1 || true
-  rc-service minio restart >/dev/null 2>&1 || rc-service minio start
+  rc-service minio start >/dev/null 2>&1 || rc-service minio restart
 
   wait_for_minio
   ensure_bucket
@@ -194,4 +183,5 @@ main() {
   echo "  rc-service minio stop"
   echo "  mc ls ${MINIO_ALIAS}"
 }
+
 main "$@"
